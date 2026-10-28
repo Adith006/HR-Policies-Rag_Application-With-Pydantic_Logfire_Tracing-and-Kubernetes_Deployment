@@ -1,0 +1,57 @@
+
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+# Python virtual environments
+.venv/
+venv/
+env/
+hrenvpolicy/
+evalsenv/
+
+# Python-generated files
+__pycache__/
+*.py[cod]
+build/
+dist/
+wheels/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local databases and backups
+backups/
+*.dump
+*.backup
+*.sqlite
+*.sqlite3
+*.db
+*.sql
+
+# Evaluation output files
+evals/results/
+
+# Downloaded models and caches
+.cache/
+.huggingface/
+.sentence_transformers/
+
+# Logs and local telemetry files
+*.log
+.logfire/
+
+# IDE and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Local source documents: review before sharing
+sample_documents/

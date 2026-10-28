@@ -1,0 +1,27 @@
+[
+  {
+    "id": "vacation-entitlement",
+    "question": "What is the company's minimum paid vacation entitlement?",
+    "ground_truth": "Employees should take a minimum of two weeks of paid vacation per year, totaling 10 business days."
+  },
+  {
+    "id": "holiday-closures",
+    "question": "When does the company close for holidays?",
+    "ground_truth": "The company is closed on all federal holidays, the day after Thanksgiving, and during the week between Christmas and the New Year."
+  },
+  {
+    "id": "parental-leave",
+    "question": "How much maternity and paternity leave does the company encourage employees to take?",
+    "ground_truth": "Employees are encouraged to take up to 16 weeks of maternity or paternity leave."
+  },
+  {
+    "id": "personal-medical-family-leave",
+    "question": "What does the policy recommend for personal, medical, or family leave?",
+    "ground_truth": "Employees are encouraged to take the current Family and Medical Leave Act maximum for personal, medical, or family leave."
+  },
+  {
+    "id": "business-travel",
+    "question": "What are the company's expectations for business travel expenses?",
+    "ground_truth": "Employees are expected to travel economy class by air, book reasonably priced hotels, and avoid excessive spending on meals and other travel expenses."
+  }
+]

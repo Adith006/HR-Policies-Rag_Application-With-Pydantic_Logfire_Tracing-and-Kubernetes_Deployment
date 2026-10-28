@@ -1,0 +1,91 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: knowledge-postgres
+  namespace: knowledge-platform
+spec:
+  clusterIP: None
+  selector:
+    app: knowledge-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: knowledge-postgres
+  namespace: knowledge-platform
+spec:
+  serviceName: knowledge-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: knowledge-postgres
+  template:
+    metadata:
+      labels:
+        app: knowledge-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: pgvector/pgvector:pg16
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: knowledge_platform
+            - name: POSTGRES_USER
+              value: app_user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: knowledge-postgres-secret
+                  key: POSTGRES_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+          startupProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - app_user
+                - -d
+                - knowledge_platform
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - app_user
+                - -d
+                - knowledge_platform
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - app_user
+                - -d
+                - knowledge_platform
+            periodSeconds: 10
+            timeoutSeconds: 3
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 5Gi

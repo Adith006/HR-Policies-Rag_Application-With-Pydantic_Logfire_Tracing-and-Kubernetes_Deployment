@@ -1,0 +1,56 @@
+
+# Environment variables
+python-dotenv
+
+# API and configuration
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+python-multipart
+
+# PDF and document processing
+pymupdf
+python-docx
+
+# LLM integration and embeddings
+portkey-ai
+openai
+sentence-transformers
+numpy
+
+# PostgreSQL and vector search
+sqlalchemy
+psycopg[binary]
+pgvector
+alembic
+
+# Background jobs
+redis
+celery
+
+# Authentication and security
+PyJWT
+pwdlib[argon2]
+
+# Tracing and monitoring
+logfire[fastapi]
+structlog
+prometheus-client
+
+# Evaluation and testing
+ragas==0.3.1
+pytest
+pytest-asyncio
+httpx
+
+# Code quality
+ruff
+
+# Guardrails
+nemoguardrails==0.24.1
+
+#langchain
+
+langchain-community==0.4.1
+langchain-openai

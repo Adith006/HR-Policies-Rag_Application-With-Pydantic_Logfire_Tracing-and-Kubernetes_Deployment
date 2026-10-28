@@ -1,0 +1,72 @@
+
+# Secrets and environment files
+.env
+.env.*
+!.env.example
+
+# Python virtual environments
+venv/
+.venv/
+env/
+hrenvpolicy/
+evalsenv/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Git
+.git/
+.gitignore
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs and temporary files
+*.log
+tmp/
+temp/
+
+# Test and coverage artifacts
+.coverage
+htmlcov/
+coverage.xml
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Documentation and local reports
+docs/
+reports/
+
+# Local databases and data artifacts
+*.sqlite
+*.sqlite3
+*.db
+*.parquet
+*.csv
+*.xlsx
+
+# Docker
+Dockerfile*
+!Dockerfile
+compose*.yaml
+compose*.yml
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+.logfire

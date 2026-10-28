@@ -1,0 +1,9 @@
+
+define flow check user question
+  if not $user_message
+    bot refuse to respond
+    stop
+
+  if len($user_message) > 2000
+    bot refuse to respond
+    stop

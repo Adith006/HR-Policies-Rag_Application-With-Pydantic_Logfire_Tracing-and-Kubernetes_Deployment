@@ -1,0 +1,69 @@
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: knowledge-api
+  namespace: knowledge-platform
+spec:
+  type: ClusterIP
+  selector:
+    app: knowledge-api
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: knowledge-api
+  namespace: knowledge-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: knowledge-api
+  template:
+    metadata:
+      labels:
+        app: knowledge-api
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: api
+          image: enterprise-ai-knowledge-platform-api:cpu-v1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - secretRef:
+                name: knowledge-api-secrets
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3

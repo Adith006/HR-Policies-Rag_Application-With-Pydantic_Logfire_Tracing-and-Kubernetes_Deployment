@@ -1,0 +1,51 @@
+
+[project]
+name = "enterprise-ai-knowledge-platform"
+version = "0.1.0"
+description = "Enterprise AI Knowledge Platform"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "python-dotenv",
+    "pydantic",
+    "sqlalchemy",
+    "psycopg[binary]",
+    "pgvector",
+    "redis",
+    "openai",
+    "portkey-ai",
+    "sentence-transformers",
+    "numpy",
+    "nemoguardrails==0.24.1",
+    "logfire[fastapi,system-metrics]",
+    "structlog",
+    "prometheus-client",
+    "sentence-transformers",
+    "torch",
+    "numpy",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.24,<0.13.0"]
+build-backend = "uv_build"
+
+
+
+[dependency-groups]
+evaluation = [
+    "ragas==0.4.3",
+    "langchain-community<0.4.2",
+    "langchain-openai",
+]
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu", marker = "sys_platform == 'linux'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
