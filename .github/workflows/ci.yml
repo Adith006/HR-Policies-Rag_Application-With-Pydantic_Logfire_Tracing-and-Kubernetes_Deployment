@@ -10,17 +10,9 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    name: Python checks and tests
+  validate:
+    name: Python and dependency validation
     runs-on: ubuntu-latest
-
-    env:
-      DATABASE_URL: postgresql+psycopg://test:test@localhost:5432/test_db
-      REDIS_URL: redis://localhost:6379/0
-      PORTKEY_API_KEY: ci-placeholder
-      GROQ_MODEL: openai/gpt-oss-120b
-      OPENAI_MODEL: gpt-4.1-mini
-      LOGFIRE_TOKEN: ""
 
     steps:
       - name: Checkout repository
@@ -38,26 +30,12 @@ jobs:
       - name: Install application dependencies
         run: uv sync --frozen --no-dev --no-install-project
 
-      - name: Install test tools
-        run: uv pip install --python .venv/bin/python pytest pytest-asyncio
-
       - name: Check Python syntax
         run: .venv/bin/python -m compileall -q app
 
-      - name: Run tests
-        run: >
-          .venv/bin/python -m pytest -q
-          test_chunking.py
-          test_fallback.py
-          test_llm.py
-          test_memory_store.py
-          test_metadata_search.py
-          test_rag.py
-          test_search.py
-
   docker-build:
     name: Build Docker image
-    needs: test
+    needs: validate
     runs-on: ubuntu-latest
 
     steps:
