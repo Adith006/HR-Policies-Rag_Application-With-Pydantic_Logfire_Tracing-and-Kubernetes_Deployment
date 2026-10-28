@@ -1,0 +1,68 @@
+
+name: Enterprise AI Platform CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Python checks and tests
+    runs-on: ubuntu-latest
+
+    env:
+      DATABASE_URL: postgresql+psycopg://test:test@localhost:5432/test_db
+      REDIS_URL: redis://localhost:6379/0
+      PORTKEY_API_KEY: ci-placeholder
+      GROQ_MODEL: openai/gpt-oss-120b
+      OPENAI_MODEL: gpt-4.1-mini
+      LOGFIRE_TOKEN: ""
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
+      - name: Verify lockfile
+        run: uv lock --check
+
+      - name: Install application dependencies
+        run: uv sync --frozen --no-dev --no-install-project
+
+      - name: Install test tools
+        run: uv pip install --python .venv/bin/python pytest pytest-asyncio
+
+      - name: Check Python syntax
+        run: .venv/bin/python -m compileall -q app
+
+      - name: Run tests
+        run: >
+          .venv/bin/python -m pytest -q
+          test_chunking.py
+          test_fallback.py
+          test_llm.py
+          test_memory_store.py
+          test_metadata_search.py
+          test_rag.py
+          test_search.py
+
+  docker-build:
+    name: Build Docker image
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build API image
+        run: docker build -t enterprise-ai-knowledge-platform-api:ci .
