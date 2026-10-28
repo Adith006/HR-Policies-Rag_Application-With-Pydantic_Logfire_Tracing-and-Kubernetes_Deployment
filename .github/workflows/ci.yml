@@ -30,6 +30,12 @@ jobs:
       - name: Install application dependencies
         run: uv sync --frozen --no-dev --no-install-project
 
+      - name: Install test tools
+        run: uv pip install --python .venv/bin/python pytest
+
+      - name: Run automated tests
+        run: .venv/bin/python -m pytest -v tests
+
       - name: Check Python syntax
         run: .venv/bin/python -m compileall -q app
 

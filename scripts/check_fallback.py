@@ -20,7 +20,7 @@ response = client.chat.completions.create(
             ),
         }
     ],
-    max_tokens=100,
+    max_tokens=512,
     temperature=0,
 )
 

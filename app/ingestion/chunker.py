@@ -4,7 +4,19 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 
 MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
-model = SentenceTransformer(MODEL_NAME)
+
+_model: SentenceTransformer | None = None
+
+
+def _get_model() -> SentenceTransformer:
+    """Load the embedding model only when chunking needs it."""
+    global _model
+
+    if _model is None:
+        _model = SentenceTransformer(MODEL_NAME)
+
+    return _model
+
 
 
 def chunk_text(
@@ -74,6 +86,13 @@ def chunk_text(
                     r"[.!?;:]$", merged_lines[-1]["text"]
                 )
                 and len(value) < 50
+
+                # NEW: avoid merging smaller-font body text into a heading.
+                and line.get("font_size", 10)
+                >= merged_lines[-1]["font_size"] - 1.0
+
+                 # NEW: avoid merging complete sentences into headings.
+                and not re.search(r"[.!?;:]$", value)
             ):
                 merged_lines[-1]["text"] += " " + value
             else:
@@ -157,7 +176,7 @@ def chunk_text(
         return []
 
     # Generate embeddings for semantic boundary detection.
-    embeddings = model.encode(
+    embeddings =  _get_model().encode(
         [unit["text"] for unit in split_units],
         normalize_embeddings=True,
     )
