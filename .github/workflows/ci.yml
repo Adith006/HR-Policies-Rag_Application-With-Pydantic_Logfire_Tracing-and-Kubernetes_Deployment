@@ -1,5 +1,5 @@
 
-name: Enterprise AI Platform CI
+name: Enterprise AI Platform CI/CD
 
 on:
   push:
@@ -40,7 +40,7 @@ jobs:
         run: .venv/bin/python -m pytest -v tests
 
   docker-build:
-    name: Build and publish Docker image
+    name: Build and publish Docker images
     needs: validate
     runs-on: ubuntu-latest
 
@@ -49,7 +49,8 @@ jobs:
       packages: write
 
     env:
-      IMAGE_NAME: ghcr.io/adith006/enterprise-ai-knowledge-platform-api
+      API_IMAGE: ghcr.io/adith006/enterprise-ai-knowledge-platform-api
+      UI_IMAGE: ghcr.io/adith006/enterprise-ai-knowledge-platform-ui
 
     steps:
       - name: Checkout repository
@@ -60,22 +61,37 @@ jobs:
           docker build \
             --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
-            --tag "${IMAGE_NAME}:${GITHUB_SHA}" \
-            --tag "${IMAGE_NAME}:latest" \
+            --tag "${API_IMAGE}:${GITHUB_SHA}" \
+            --tag "${API_IMAGE}:latest" \
+            .
+
+      - name: Build Streamlit image
+        run: |
+          docker build \
+            --file ui/Dockerfile \
+            --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --tag "${UI_IMAGE}:${GITHUB_SHA}" \
+            --tag "${UI_IMAGE}:latest" \
             .
 
       - name: Authenticate to GitHub Container Registry
         if: ${{ github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
         env:
-          CR_PAT: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          printf '%s' "$CR_PAT" | docker login ghcr.io \
-            -u "$GITHUB_ACTOR" --password-stdin
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io \
+            --username "$GITHUB_ACTOR" \
+            --password-stdin
 
-      - name: Publish versioned image
+      - name: Publish API image
         if: ${{ github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-        run: docker push "${IMAGE_NAME}:${GITHUB_SHA}"
+        run: |
+          docker push "${API_IMAGE}:${GITHUB_SHA}"
+          docker push "${API_IMAGE}:latest"
 
-      - name: Publish latest image
+      - name: Publish Streamlit image
         if: ${{ github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-        run: docker push "${IMAGE_NAME}:latest"
+        run: |
+          docker push "${UI_IMAGE}:${GITHUB_SHA}"
+          docker push "${UI_IMAGE}:latest"
