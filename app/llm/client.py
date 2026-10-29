@@ -59,6 +59,14 @@ def _record_completion_metadata(span, response, configured_model: str) -> None:
         if isinstance(value, int) and not isinstance(value, bool):
             span.set_attribute(attribute_name, value)
 
+def _normalize_answer_text(text: str) -> str:
+    """Normalize unusual spaces and common encoding artifacts."""
+    text = text.replace("â€¯", " ")
+    text = text.replace("â¯", " ")
+    text = text.replace("\u202f", " ")
+    text = text.replace("\u00a0", " ")
+
+    return " ".join(text.split())
 
 def generate_answer(
     question: str,
@@ -197,8 +205,9 @@ def generate_answer(
         )
         span.set_attribute("llm.response.length", len(answer.strip()))
 
-        return answer.strip()
-
+        answer = _normalize_answer_text(answer)
+        span.set_attribute("llm.response.length", len(answer))
+        return answer
 
 def extract_long_term_memories(
     question: str,

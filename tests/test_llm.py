@@ -13,6 +13,19 @@ os.environ.setdefault("OPENAI_MODEL", "test-model")
 
 llm_client = importlib.import_module("app.llm.client")
 
+def test_generate_answer_normalizes_malformed_spaces(mocked_llm):
+    mocked_llm.return_value = make_response(
+        "Report harassment to the Viceâ¯Chair."
+    )
+
+    answer = llm_client.generate_answer(
+        question="Who should receive the report?",
+        context="Report harassment to the Vice Chair.",
+    )
+
+    assert answer == "Report harassment to the Vice Chair."
+    assert "â¯" not in answer
+
 
 def make_response(content="Test answer", include_choice=True):
     """Build a simulated Portkey response without making a network request."""
