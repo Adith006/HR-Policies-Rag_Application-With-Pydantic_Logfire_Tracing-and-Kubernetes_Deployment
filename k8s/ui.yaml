@@ -1,0 +1,72 @@
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: knowledge-ui
+  namespace: knowledge-platform
+  labels:
+    app: knowledge-ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: knowledge-ui
+  template:
+    metadata:
+      labels:
+        app: knowledge-ui
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      containers:
+        - name: streamlit
+          image: ghcr.io/adith006/enterprise-ai-knowledge-platform-ui:389703c6a7459950e625618a0f178a45e09e2124
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8501
+          env:
+            - name: API_BASE_URL
+              value: "http://knowledge-api:8000"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          startupProbe:
+            httpGet:
+              path: /_stcore/health
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 24
+          readinessProbe:
+            httpGet:
+              path: /_stcore/health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /_stcore/health
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: knowledge-ui
+  namespace: knowledge-platform
+spec:
+  type: ClusterIP
+  selector:
+    app: knowledge-ui
+  ports:
+    - name: http
+      port: 8501
+      targetPort: http

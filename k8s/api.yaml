@@ -29,9 +29,11 @@ spec:
         app: knowledge-api
     spec:
       terminationGracePeriodSeconds: 30
+      imagePullSecrets:
+        - name: ghcr-pull-secret
       containers:
         - name: api
-          image: enterprise-ai-knowledge-platform-api:cpu-v1
+          image: ghcr.io/adith006/enterprise-ai-knowledge-platform-api:a993fd6350d58d373e5d169e7b37849a2a7d4239
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
