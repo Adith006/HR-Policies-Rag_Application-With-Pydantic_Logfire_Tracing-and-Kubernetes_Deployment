@@ -1,4 +1,3 @@
-
 import re
 
 JAILBREAK_PATTERNS = [
@@ -13,15 +12,53 @@ JAILBREAK_PATTERNS = [
     r"\b(output|print|reveal|leak)\b.{0,40}\b(api key|secret key|credentials)\b",
 ]
 
+HR_POLICY_PATTERNS = [
+    r"\b(?:hr|human resources)\b",
+    r"\bemployees?\b",
+    r"\bworkplace\b",
+    r"\bemployment\b",
+    r"\b(?:harass\w*|bully\w*|discriminat\w*|retaliat\w*)\b",
+    r"\b(?:leave|vacation|holiday|maternity|paternity|bereavement)\b",
+    r"\b(?:salary|payroll|compensation|benefits?|reimbursement|business travel)\b",
+    r"\b(?:code of conduct|ethics|misconduct|violations?|complaints?|grievances?)\b",
+    r"\b(?:attendance|working hours|overtime|remote work|work from home)\b",
+    r"\b(?:accommodation|termination|resignation|probation|performance review)\b",
+    r"\bconflict of interest\b",
+]
+
+FOLLOW_UP_PATTERNS = [
+    r"^(?:what about|how about|what if)\b",
+    r"^(?:does that|does this|is that|is this)\b",
+    r"^(?:what happens if|what happens next)\b",
+    r"^(?:can they do that|can i do that|would that be allowed)\b",
+]
+
+
 def is_jailbreak_attempt(text: str) -> bool:
     """Detect common direct or embedded jailbreak phrases."""
     if not isinstance(text, str):
         return False
 
     normalized = re.sub(r"\s+", " ", text).strip().lower()
-    return any(re.search(pattern, normalized) for pattern in JAILBREAK_PATTERNS)
+    return any(
+        re.search(pattern, normalized)
+        for pattern in JAILBREAK_PATTERNS
+    )
 
 
 def contains_suspicious_document_instructions(context: str) -> bool:
     """Flag retrieved text containing common instruction-override patterns."""
     return is_jailbreak_attempt(context)
+
+
+def is_hr_policy_question(text: str) -> bool:
+    """Check whether a question appears related to HR policies."""
+    if not isinstance(text, str) or not text.strip():
+        return False
+
+    normalized = re.sub(r"\s+", " ", text).strip().lower()
+
+    return any(
+        re.search(pattern, normalized)
+        for pattern in HR_POLICY_PATTERNS + FOLLOW_UP_PATTERNS
+    )

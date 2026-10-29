@@ -7,7 +7,11 @@ import logfire
 from app.cache.redis_cache import get_cached_answer, cache_answer
 from app.guardrails.grounding import validate_grounding
 from app.guardrails.jailbreaks import contains_suspicious_document_instructions
-from app.guardrails.validation import validate_question
+from app.guardrails.validation import (
+    validate_question,
+    QuestionRejectedError,
+    HR_POLICY_REFUSAL,
+)
 from app.llm.client import generate_answer, extract_long_term_memories
 from app.memory import ConversationMemory
 from app.memory_store import search_memories, store_memory
@@ -73,8 +77,21 @@ def answer_question(
 
     # Do not include the question, user ID, or session ID as span attributes.
     with logfire.span("rag.validate_question") as span:
-        question = validate_question(question)
-        span.set_attribute("question.length", len(question))
+        try:
+            question = validate_question(question)
+            span.set_attribute("question.length", len(question))
+            span.set_attribute("guardrail.blocked", False)
+
+        except QuestionRejectedError:
+            span.set_attribute("guardrail.blocked", True)
+            span.set_attribute("guardrail.reason", "jailbreak_attempt")
+
+            return {
+                "question": question,
+                "answer": HR_POLICY_REFUSAL,
+                "sources": [],
+                "cache": "BYPASS",
+            }
 
     # 1. Load short-term conversation history.
     with logfire.span("memory.short_term.retrieve") as span:
