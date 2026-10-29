@@ -126,13 +126,13 @@ def answer_question(
                     "top_k": top_k,
                     "document_type": document_type,
                     "neighbor_window": neighbor_window,
-                    "version": 8,
+                    "version": 9,
                 },
                 sort_keys=True,
             ).encode()
         ).hexdigest()
 
-        span.set_attribute("cache.version", 8)
+        span.set_attribute("cache.version", 9)
 
     # 4. Check the shared cache only for first-turn questions.
     cached_data = None
