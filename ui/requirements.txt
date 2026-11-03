@@ -1,2 +1,19 @@
+﻿--extra-index-url https://download.pytorch.org/whl/cpu
+
 streamlit>=1.40,<2.0
 httpx>=0.27,<1.0
+python-dotenv
+SQLAlchemy
+psycopg[binary]
+pgvector
+redis
+logfire
+portkey-ai
+openai
+sentence-transformers==6.2.0
+torch==2.14.1+cpu
+torchvision==0.29.1+cpu
+ragas==0.3.1
+langchain-community==0.4.1
+langchain-openai==1.7.2
+pandas>=2.2,<3.0

@@ -51,3 +51,22 @@ def validate_grounding(answer: str, context: str) -> bool:
 
 
     return True
+
+def validate_grounding_with_memory(
+    answer: str,
+    context: str,
+    long_term_memories: list[dict] | None = None,
+) -> bool:
+    """Validate an answer against document context and retrieved memories."""
+
+    memory_context = "\n".join(
+        memory.get("memory", "")
+        for memory in (long_term_memories or [])
+        if isinstance(memory, dict)
+    )
+
+    combined_evidence = "\n".join(
+        part for part in [context, memory_context] if part.strip()
+    )
+
+    return validate_grounding(answer, combined_evidence)

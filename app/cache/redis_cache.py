@@ -4,8 +4,19 @@ import os
 
 import redis
 
-redis_client = redis.Redis.from_url(
-    os.getenv("REDIS_URL", "redis://localhost:6379/0"),
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+REDIS_URL = os.getenv("REDIS_URL")
+
+if not REDIS_URL:
+    raise RuntimeError("REDIS_URL is not configured.")
+
+redis_client = redis.from_url(
+    REDIS_URL,
     decode_responses=True,
 )
 
@@ -45,12 +56,14 @@ def cache_answer(
     answer: str,
     sources: list[dict],
     context: str,
+    retrieved_contexts: list[dict] | None = None,
 ) -> None:
-    """Cache the answer, source citations, and grounding context."""
+    """Cache the answer, source citations, and retrieved context chunks."""
     payload = {
         "answer": answer,
         "sources": sources,
         "context": context,
+        "retrieved_contexts": retrieved_contexts or [],
     }
 
     redis_client.setex(

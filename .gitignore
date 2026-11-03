@@ -55,3 +55,6 @@ Thumbs.db
 
 # Local source documents: review before sharing
 sample_documents/
+
+# Streamlit credentials
+.streamlit/secrets.toml

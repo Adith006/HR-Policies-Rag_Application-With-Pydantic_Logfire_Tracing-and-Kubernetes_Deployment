@@ -54,3 +54,4 @@ nemoguardrails==0.24.1
 
 langchain-community==0.4.1
 langchain-openai
+streamlit[pdf]==1.66.1

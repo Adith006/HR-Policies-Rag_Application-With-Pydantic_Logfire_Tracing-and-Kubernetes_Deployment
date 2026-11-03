@@ -1,6 +1,10 @@
-
 from app.db.session import Base, engine
-from app.db.models import DocumentChunk, ConversationMemory
+from app.db.models import (
+    DocumentChunk,
+    ConversationMemory,
+    ChatConversation,
+    ChatMessage,
+)
 
 
 def init_db():

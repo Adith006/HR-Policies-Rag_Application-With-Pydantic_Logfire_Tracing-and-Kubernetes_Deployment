@@ -1,16 +1,16 @@
-
-import logfire
-from sentence_transformers import SentenceTransformer
+﻿import logfire
 from sqlalchemy import select
 
 from app.db.models import DocumentChunk
 from app.db.session import SessionLocal
+from app.embeddings import MODEL_NAME, get_embedding_model
+from app.rag_trace import trace_stage
 
-MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 RERANKER_NAME = "cross-encoder/ms-marco-MiniLM-L6-v2"
-RERANK_SCORE_MARGIN = 0.15
+RERANK_SCORE_MARGIN = 1.0
 
-model = SentenceTransformer(MODEL_NAME)
+# The embedding model is managed by get_embedding_model() in app.embeddings.
+# Keep one reranker instance per Python process.
 _reranker = None
 
 
@@ -124,121 +124,138 @@ def semantic_search(
 
     candidate_limit = top_k * 3 if rerank else top_k
 
-    # 1. Generate the query embedding.
-    with logfire.span("retrieval.query_embedding") as span:
-        query_embedding = model.encode(
-            question,
-            normalize_embeddings=True,
-        ).tolist()
+    with trace_stage("Query embedding generation") as trace:
+        trace["model"] = MODEL_NAME
+        # 1. Generate the query embedding.
+        with logfire.span("retrieval.query_embedding") as span:
+            query_text = f"Query: {question}"
+            query_embedding = get_embedding_model().encode(
+                query_text,
+                normalize_embeddings=True,
+                ).tolist()
 
-        span.set_attribute(
-            "embedding.dimensions",
-            len(query_embedding),
+
+            span.set_attribute(
+                "embedding.dimensions",
+                len(query_embedding),
+            )
+
+    with trace_stage("pgvector candidate retrieval") as trace:
+        trace["model"] = "pgvector cosine similarity"
+        # 2. Retrieve a wider candidate pool using pgvector.
+        distance = DocumentChunk.embedding.cosine_distance(query_embedding)
+
+        statement = select(
+            DocumentChunk,
+            distance.label("distance"),
         )
 
-    # 2. Retrieve a wider candidate pool using pgvector.
-    distance = DocumentChunk.embedding.cosine_distance(query_embedding)
-
-    statement = select(
-        DocumentChunk,
-        distance.label("distance"),
-    )
-
-    if document_type:
-        statement = statement.where(
-            DocumentChunk.metadata_["document_type"].astext
-            == document_type
-        )
-
-    statement = statement.order_by(distance).limit(candidate_limit)
-
-    candidates = []
-
-    with SessionLocal() as session:
-        with logfire.span("retrieval.pgvector_query") as span:
-            matches = session.execute(statement).all()
-
-            span.set_attribute(
-                "retrieval.candidate_count",
-                len(matches),
-            )
-            span.set_attribute(
-                "retrieval.requested_top_k",
-                top_k,
-            )
-            span.set_attribute(
-                "retrieval.candidate_limit",
-                candidate_limit,
+        if document_type:
+            statement = statement.where(
+                DocumentChunk.metadata_["document_type"].astext
+                == document_type
             )
 
-        for query_rank, (chunk, distance_value) in enumerate(matches, start=1):
-            # Avoid duplicate chunks before reranking.
-            if any(
-                item["_chunk"].source == chunk.source
-                and item["_chunk"].page_number == chunk.page_number
-                and item["_chunk"].chunk_index == chunk.chunk_index
-                for item in candidates
-            ):
-                continue
+        statement = statement.order_by(distance).limit(candidate_limit)
 
-            if any(item["text"] == chunk.text for item in candidates):
-                continue
+        candidates = []
 
-            candidates.append(
-                {
-                    "source": chunk.source,
-                    "page_number": chunk.page_number,
-                    "chunk_index": chunk.chunk_index,
-                    "text": chunk.text,
-                    "metadata": chunk.metadata_,
-                    "similarity": round(
-                        1 - float(distance_value),
-                        4,
-                    ),
-                    "context_text": chunk.text.strip(),
-                    "context_chunk_indices": [chunk.chunk_index],
-                    "_chunk": chunk,
-                    "_query_rank": query_rank,
-                }
-            )
+        with SessionLocal() as session:
+            with logfire.span("retrieval.pgvector_query") as span:
+                matches = session.execute(statement).all()
+
+                span.set_attribute(
+                    "retrieval.candidate_count",
+                    len(matches),
+                )
+                span.set_attribute(
+                    "retrieval.requested_top_k",
+                    top_k,
+                )
+                span.set_attribute(
+                    "retrieval.candidate_limit",
+                    candidate_limit,
+                )
+
+            for query_rank, (chunk, distance_value) in enumerate(matches, start=1):
+                # Avoid duplicate chunks before reranking.
+                if any(
+                    item["_chunk"].source == chunk.source
+                    and item["_chunk"].page_number == chunk.page_number
+                    and item["_chunk"].chunk_index == chunk.chunk_index
+                    for item in candidates
+                ):
+                    continue
+
+                if any(item["text"] == chunk.text for item in candidates):
+                    continue
+
+                candidates.append(
+                    {
+                        "source": chunk.source,
+                        "page_number": chunk.page_number,
+                        "chunk_index": chunk.chunk_index,
+                        "text": chunk.text,
+                        "metadata": chunk.metadata_,
+                        "similarity": round(
+                            1 - float(distance_value),
+                            4,
+                        ),
+                        "context_text": chunk.text.strip(),
+                        "context_chunk_indices": [chunk.chunk_index],
+                        "_chunk": chunk,
+                        "_query_rank": query_rank,
+                    }
+                )
 
     # 3. Rerank the candidates using question-passage relevance.
     if rerank and candidates:
-        with logfire.span("retrieval.cross_encoder_rerank") as span:
-            span.set_attribute(
-                "reranker.model",
-                RERANKER_NAME,
-            )
-            span.set_attribute(
-                "reranker.candidate_count",
-                len(candidates),
-            )
+        with trace_stage("Cross-encoder reranking") as trace:
+            trace["model"] = RERANKER_NAME
+            trace["candidate_count"] = len(candidates)
+            with logfire.span("retrieval.cross_encoder_rerank") as span:
+                span.set_attribute(
+                    "reranker.model",
+                    RERANKER_NAME,
+                )
+                span.set_attribute(
+                    "reranker.candidate_count",
+                    len(candidates),
+                )
 
-            reranker = _get_reranker()
+                reranker = _get_reranker()
 
-            pairs = [
-                (question, candidate["text"])
-                for candidate in candidates
-            ]
+                pairs = [
+                    (question,
+                     (
+                         f"Section: "
+                         f"{candidate['metadata'].get('section_title', '')}\n"f"Content: {candidate['text']}"
+                         ),
+                         )
+                         for candidate in candidates
+                         ]
 
-            scores = reranker.predict(
-                pairs,
-                show_progress_bar=False,
-            )
 
-            for candidate, score in zip(candidates, scores):
-                candidate["rerank_score"] = float(score)
 
-            candidates.sort(
-                key=lambda item: item["rerank_score"],
-                reverse=True,
-            )
+                scores = reranker.predict(
+                    pairs,
+                    show_progress_bar=False,
+                )
 
-            span.set_attribute(
-                "reranker.top_score",
-                candidates[0]["rerank_score"],
-            )
+                for candidate, score in zip(candidates, scores):
+                    candidate["rerank_score"] = float(score)
 
+                candidates.sort(
+                    key=lambda item: item["rerank_score"],
+                    reverse=True,
+                )
+
+                span.set_attribute(
+                    "reranker.top_score",
+                    candidates[0]["rerank_score"],
+                )
+
+            trace["top_score"] = candidates[0]["rerank_score"]
     # 4. Log ranked candidate diagnostics without recording document text.
     for rerank_rank, candidate in enumerate(candidates, start=1):
         with logfire.span("retrieval.candidate_diagnostic") as span:
@@ -263,10 +280,10 @@ def semantic_search(
 
     # 5. Select top results and expand neighbors around the best result.
     best_rerank_score = (
-    candidates[0]["rerank_score"]
-    if rerank and candidates
-    else None
-)
+        candidates[0]["rerank_score"]
+        if rerank and candidates
+        else None
+    )
     results = []
 
     with SessionLocal() as session:
@@ -298,11 +315,13 @@ def semantic_search(
                 continue
 
             if not results:
-                context_text, context_indices = _build_context(
-                    session,
-                    chunk,
-                    neighbor_window,
-                )
+                with trace_stage("Neighbor context expansion") as trace:
+                    context_text, context_indices = _build_context(
+                        session,
+                        chunk,
+                        neighbor_window,
+                    )
+                    trace["context_chunk_count"] = len(context_indices)
             else:
                 context_text = chunk.text.strip()
                 context_indices = [chunk.chunk_index]

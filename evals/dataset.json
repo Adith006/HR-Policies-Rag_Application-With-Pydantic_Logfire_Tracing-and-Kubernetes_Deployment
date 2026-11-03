@@ -1,27 +1,27 @@
 [
   {
-    "id": "vacation-entitlement",
-    "question": "What is the company's minimum paid vacation entitlement?",
-    "ground_truth": "Employees should take a minimum of two weeks of paid vacation per year, totaling 10 business days."
+    "id": "vision-statement",
+    "question": "What is the vision of the organization as stated in the policy manual?",
+    "ground_truth":"To serve as a reliable product development partner for legislators who want to make systems of governance more open, more accessible, and more effective. Our products are iteratively built to address meaningful well-known problems in new, innovative ways"
   },
   {
-    "id": "holiday-closures",
-    "question": "When does the company close for holidays?",
-    "ground_truth": "The company is closed on all federal holidays, the day after Thanksgiving, and during the week between Christmas and the New Year."
+    "id": "payroll-schedule",
+    "question": "How often is payroll administered and on what dates?",
+    "ground_truth": "Administered twice monthly, on the 15th and last day of each month, via direct deposit."
   },
   {
-    "id": "parental-leave",
-    "question": "How much maternity and paternity leave does the company encourage employees to take?",
-    "ground_truth": "Employees are encouraged to take up to 16 weeks of maternity or paternity leave."
+    "id": "health-insurance-split",
+    "question": "What percentage of the health and dental insurance premium cost does the company pay?",
+    "ground_truth": "The company pays 80% of the premium cost of the plan."
   },
   {
-    "id": "personal-medical-family-leave",
-    "question": "What does the policy recommend for personal, medical, or family leave?",
-    "ground_truth": "Employees are encouraged to take the current Family and Medical Leave Act maximum for personal, medical, or family leave."
+    "id": "professional-development-budget",
+    "question": "What minimum percentage of its planned operating budget does the organization set aside to fund professional development activities?",
+    "ground_truth": "The organization will endeavor to set aside an amount equal to 2.0% (at minimum) of its planned operating budget to fund professional development activities."
   },
   {
-    "id": "business-travel",
-    "question": "What are the company's expectations for business travel expenses?",
-    "ground_truth": "Employees are expected to travel economy class by air, book reasonably priced hotels, and avoid excessive spending on meals and other travel expenses."
+    "id": "daily-standup-duration",
+    "question": "What is the maximum duration specified for daily standup meetings?",
+    "ground_truth": "To better coordinate organizational or product development efforts, one or more daily standups may be scheduled, each lasting no longer than 15 minutes."
   }
 ]

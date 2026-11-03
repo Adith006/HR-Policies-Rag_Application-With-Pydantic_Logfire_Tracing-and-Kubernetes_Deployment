@@ -1,21 +1,22 @@
 
 import re
 import numpy as np
-from sentence_transformers import SentenceTransformer
 
-MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+from app.embeddings import get_embedding_model
 
-_model: SentenceTransformer | None = None
+# MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+
+# _model: SentenceTransformer | None = None
 
 
-def _get_model() -> SentenceTransformer:
-    """Load the embedding model only when chunking needs it."""
-    global _model
+# def _get_model() -> SentenceTransformer:
+#     """Load the embedding model only when chunking needs it."""
+#     global _model
 
-    if _model is None:
-        _model = SentenceTransformer(MODEL_NAME)
+#     if _model is None:
+#         _model = SentenceTransformer(MODEL_NAME)
 
-    return _model
+#     return _model
 
 
 
@@ -176,7 +177,7 @@ def chunk_text(
         return []
 
     # Generate embeddings for semantic boundary detection.
-    embeddings =  _get_model().encode(
+    embeddings =  get_embedding_model().encode(
         [unit["text"] for unit in split_units],
         normalize_embeddings=True,
     )

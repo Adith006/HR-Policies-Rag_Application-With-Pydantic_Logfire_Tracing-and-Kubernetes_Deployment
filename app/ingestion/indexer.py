@@ -1,11 +1,21 @@
 
-from sentence_transformers import SentenceTransformer
+from app.embeddings import get_embedding_model
 from sqlalchemy import delete
+
 from app.db.session import SessionLocal
 from app.db.models import DocumentChunk
 from app.ingestion.pipeline import process_pdf
 
-MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+
+def build_embedding_text(chunk: dict) -> str:
+    """Combine section context and chunk content for embedding."""
+    metadata = chunk.get("metadata", {})
+    section_title = metadata.get("section_title", "General")
+
+    return (
+        f"Section: {section_title}\n"
+        f"Content: {chunk['text']}"
+    )
 
 
 def index_pdf(file_path: str) -> int:
@@ -15,9 +25,17 @@ def index_pdf(file_path: str) -> int:
         print("No text chunks found. Existing records were not changed.")
         return 0
 
-    model = SentenceTransformer(MODEL_NAME)
-    texts = [chunk["text"] for chunk in chunks]
-    embeddings = model.encode(texts, normalize_embeddings=True)
+    model = get_embedding_model()
+
+    texts = [
+        build_embedding_text(chunk)
+        for chunk in chunks
+    ]
+
+    embeddings = model.encode(
+        texts,
+        normalize_embeddings=True,
+    )
 
     records = [
         DocumentChunk(
@@ -35,7 +53,6 @@ def index_pdf(file_path: str) -> int:
 
     with SessionLocal() as session:
         try:
-            # Remove old chunks for this source and insert updated chunks.
             session.execute(
                 delete(DocumentChunk).where(
                     DocumentChunk.source == source_name
