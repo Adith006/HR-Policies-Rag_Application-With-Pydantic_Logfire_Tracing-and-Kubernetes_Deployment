@@ -3,6 +3,10 @@
 .env
 .env.*
 !.env.example
+.streamlit/secrets.toml
+.logfire/
+*.pem
+*.key
 
 # Python virtual environments
 venv/

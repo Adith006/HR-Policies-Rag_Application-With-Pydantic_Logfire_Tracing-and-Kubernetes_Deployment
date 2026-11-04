@@ -28,10 +28,10 @@ jobs:
         run: uv lock --check
 
       - name: Install application dependencies
-        run: uv sync --frozen --no-dev --no-install-project
+        run: uv sync --frozen --no-dev --no-install-project --group evaluation
 
       - name: Check Python syntax
-        run: .venv/bin/python -m compileall -q app
+        run: .venv/bin/python -m compileall -q app evals ui tests
 
       - name: Install test tools
         run: uv pip install --python .venv/bin/python pytest

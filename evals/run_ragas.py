@@ -149,16 +149,17 @@ class SharedSentenceTransformerEmbeddings(Embeddings):
     """Reuse the RAG application's cached embedding model."""
 
     def __init__(self):
-        self.model = get_embedding_model()
+        self.model = EMBEDDING_MODEL
+        self.embedding_model = get_embedding_model()
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
-        return self.model.encode(
+        return self.embedding_model.encode(
             texts,
             normalize_embeddings=True,
         ).tolist()
 
     def embed_query(self, text: str) -> list[float]:
-        return self.model.encode(
+        return self.embedding_model.encode(
             text,
             normalize_embeddings=True,
         ).tolist()

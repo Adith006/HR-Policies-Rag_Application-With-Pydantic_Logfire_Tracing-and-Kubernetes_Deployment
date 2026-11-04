@@ -1,4 +1,5 @@
 ﻿
+
 import hashlib
 import json
 import os
@@ -8,12 +9,17 @@ from pathlib import Path
 
 import streamlit as st
 from dotenv import load_dotenv
-from ui.HR_Policy_Manual import display_policy_manual
 
+# Resolve project root before importing project modules.
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+# Load local environment configuration.
 load_dotenv(PROJECT_ROOT / ".env")
+
+# Import application modules only after setting the project path.
+from ui.HR_Policy_Manual import display_policy_manual
+
 
 st.set_page_config(
     page_title="Enterprise AI Knowledge Platform",

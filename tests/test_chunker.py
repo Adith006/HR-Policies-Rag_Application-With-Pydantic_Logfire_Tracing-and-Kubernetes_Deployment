@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-
+from app.embeddings import get_embedding_model
 from app.ingestion import chunker
 
 
@@ -18,7 +18,7 @@ class FakeEmbeddingModel:
 def mock_embedding_model(monkeypatch):
     monkeypatch.setattr(
         chunker,
-        "_get_model",
+        "get_embedding_model",
         lambda: FakeEmbeddingModel(),
     )
 

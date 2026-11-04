@@ -164,8 +164,12 @@ def test_generate_answer_rejects_empty_response_content(mocked_llm):
 def test_extract_long_term_memories_parses_json(mocked_llm):
     mocked_llm.return_value = make_response(
         '```json\n'
-        '["Prefers concise answers", "Uses Python", '
-        '"Building a RAG project", "Extra memory"]\n'
+        '['
+        '{"memory": "Prefers concise answers", "type": "user_preference"}, '
+        '{"memory": "Uses Python", "type": "user_provided_fact"}, '
+        '{"memory": "Building a RAG project", "type": "project_context"}, '
+        '{"memory": "Extra memory", "type": "conversation_context"}'
+        ']\n'
         '```'
     )
 
@@ -175,9 +179,9 @@ def test_extract_long_term_memories_parses_json(mocked_llm):
     )
 
     assert memories == [
-        "Prefers concise answers",
-        "Uses Python",
-        "Building a RAG project",
+        {"memory": "Prefers concise answers", "type": "user_preference"},
+        {"memory": "Uses Python", "type": "user_provided_fact"},
+        {"memory": "Building a RAG project", "type": "project_context"},
     ]
 
 

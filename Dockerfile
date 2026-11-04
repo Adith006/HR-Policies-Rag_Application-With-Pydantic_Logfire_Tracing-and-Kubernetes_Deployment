@@ -10,14 +10,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
 
-# Copy dependency metadata first for Docker layer caching.
 COPY pyproject.toml uv.lock ./
 
-# Install dependencies exactly as locked, without installing the project itself.
-RUN uv sync --frozen --no-dev --no-install-project
+# Install production dependencies and the evaluation group.
+RUN uv sync --frozen --no-dev --no-install-project --group evaluation
 
-# Copy application source.
+# Copy backend and evaluation source.
 COPY app/ ./app/
+COPY evals/ ./evals/
 
 EXPOSE 8000
 
