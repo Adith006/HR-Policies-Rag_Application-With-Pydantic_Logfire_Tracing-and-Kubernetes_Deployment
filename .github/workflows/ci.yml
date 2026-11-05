@@ -95,3 +95,63 @@ jobs:
         run: |
           docker push "${UI_IMAGE}:${GITHUB_SHA}"
           docker push "${UI_IMAGE}:latest"
+
+  deploy-oracle:
+    name: Deploy to Oracle Cloud
+    needs: docker-build
+    if: ${{ github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Deploy latest images to Oracle VM
+        env:
+          ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
+          ORACLE_USER: ${{ secrets.ORACLE_USER }}
+          ORACLE_SSH_PRIVATE_KEY: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
+          ORACLE_KNOWN_HOSTS: ${{ secrets.ORACLE_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+
+          KEY_FILE="$RUNNER_TEMP/oracle_deploy_key"
+          KNOWN_HOSTS_FILE="$RUNNER_TEMP/oracle_known_hosts"
+
+          trap 'rm -f "$KEY_FILE" "$KNOWN_HOSTS_FILE"' EXIT
+
+          printf '%s\n' "$ORACLE_SSH_PRIVATE_KEY" > "$KEY_FILE"
+          printf '%s\n' "$ORACLE_KNOWN_HOSTS" > "$KNOWN_HOSTS_FILE"
+
+          chmod 600 "$KEY_FILE"
+          chmod 600 "$KNOWN_HOSTS_FILE"
+
+          ssh \
+            -i "$KEY_FILE" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$KNOWN_HOSTS_FILE" \
+            -o ConnectTimeout=15 \
+            "$ORACLE_USER@$ORACLE_HOST" \
+            'set -e
+             cd /home/opc
+             sudo docker compose -f compose.yaml pull api ui
+             sudo docker compose -f compose.yaml up -d --remove-orphans
+             sudo docker compose -f compose.yaml ps'
+
+      - name: Verify production HTTPS endpoint
+        run: |
+          set -euo pipefail
+
+          API_URL="https://hr-policies-api.duckdns.org/docs"
+
+          for attempt in $(seq 1 12); do
+            if curl --fail --silent --show-error "$API_URL" -o /dev/null; then
+              echo "Oracle deployment verified successfully."
+              exit 0
+            fi
+
+            echo "Health check attempt $attempt failed. Retrying..."
+            sleep 10
+          done
+
+          echo "Deployment health verification failed."
+          exit 1
