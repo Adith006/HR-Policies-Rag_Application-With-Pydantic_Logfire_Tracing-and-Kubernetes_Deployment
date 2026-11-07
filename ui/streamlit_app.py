@@ -93,6 +93,8 @@ for key in CONFIG_KEYS:
 
 API_BASE_URL = os.getenv("API_BASE_URL", "").rstrip("/")
 API_MODE = bool(API_BASE_URL)
+print("APPLICATION MODE:", "API" if API_MODE else "DIRECT")
+print("API BASE URL CONFIGURED:", bool(API_BASE_URL))
 
 if not API_MODE:
     required_keys = [
