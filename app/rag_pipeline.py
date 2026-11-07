@@ -347,7 +347,8 @@ def answer_question(
 
         with logfire.span("memory.short_term.retrieve") as span:
 
-            history = conversation_memory.get_history(session_id)
+            # history = conversation_memory.get_history(session_id)
+            history = conversation_memory.get_history(user_id, session_id)
 
             span.set_attribute(
                 "memory.message_count",
@@ -400,6 +401,7 @@ def answer_question(
             )
 
             conversation_memory.add_turn(
+                user_id,
                 session_id,
                 question,
                 answer,
@@ -447,6 +449,7 @@ def answer_question(
             )
 
             conversation_memory.add_turn(
+                user_id,
                 session_id,
                 question,
                 answer,
@@ -461,6 +464,7 @@ def answer_question(
             }
 
         conversation_memory.add_turn(
+            user_id,
             session_id,
             question,
             answer,
@@ -612,6 +616,12 @@ def answer_question(
         #     user_id,
         #     session_id,
         # )
+        conversation_memory.add_turn(
+            user_id,
+            session_id,
+            question,
+            answer,
+        )
 
         return {
             "question": question,
@@ -677,6 +687,7 @@ def answer_question(
             ):
 
                 conversation_memory.add_turn(
+                    user_id,
                     session_id,
                     question,
                     answer,
@@ -737,6 +748,7 @@ def answer_question(
             ):
 
                 conversation_memory.add_turn(
+                    user_id,
                     session_id,
                     question,
                     answer,
@@ -857,6 +869,7 @@ def answer_question(
             ):
 
                 conversation_memory.add_turn(
+                    user_id,
                     session_id,
                     question,
                     answer,
@@ -921,6 +934,7 @@ def answer_question(
                 answer,
                 sources,
                 context,
+                retrieved_contexts=retrieved_contexts,
             )
 
     # ============================================================
@@ -930,6 +944,7 @@ def answer_question(
     with logfire.span("memory.short_term.save_turn"):
 
         conversation_memory.add_turn(
+            user_id,
             session_id,
             question,
             answer,

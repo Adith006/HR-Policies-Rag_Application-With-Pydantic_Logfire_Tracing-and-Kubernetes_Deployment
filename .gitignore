@@ -58,3 +58,10 @@ sample_documents/
 
 # Streamlit credentials
 .streamlit/secrets.toml
+
+# Local Streamlit secrets and temporary configuration
+.streamlit/touch.streamlit/
+.streamlit/**/secrets.toml
+
+# Local Oracle SSH host fingerprints
+oracle_known_hosts

@@ -8,6 +8,7 @@ memory_id = store_memory(
     user_id=user_id,
     session_id=session_id,
     memory_text="The employee vacation policy recommends 10 business days of paid vacation per year.",
+    memory_type="project_context",
 )
 
 print("Stored memory ID:", memory_id)

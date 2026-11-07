@@ -27,6 +27,29 @@ st.set_page_config(
     layout="wide",
 )
 
+# ==========================================
+# GOOGLE AUTHENTICATION
+# ==========================================
+
+if not st.user.is_logged_in:
+    st.title("HR Policies Assistant")
+    st.write("Sign in with Google to access the HR Policies Assistant.")
+
+    if st.button("Continue with Google", type="primary"):
+        st.login()
+
+    st.stop()
+
+# Retrieve verified identity and ID token from Streamlit OIDC.
+google_user_id = st.user.get("sub")
+google_id_token = st.user.tokens.get("id")
+
+if not google_user_id or not google_id_token:
+    st.error("Authentication failed. Please sign in again.")
+    st.stop()
+
+CHAT_USER_ID = str(google_user_id)
+
 # Style the Ragas panel as a right-hand sidebar.
 st.markdown(
     """
@@ -489,7 +512,11 @@ def load_saved_conversation(conversation_id):
 
     # Restore the recent conversation turns into Redis.
     memory = get_short_term_memory()
-    memory.clear_history(conversation_id)
+    # memory.clear_history(conversation_id)
+    memory.clear_history(
+        st.session_state.user_id,
+        conversation_id,
+        )
 
     for index in range(len(saved_messages) - 1):
         current = saved_messages[index]
@@ -500,6 +527,7 @@ def load_saved_conversation(conversation_id):
             and following["role"] == "assistant"
         ):
             memory.add_turn(
+                user_id=st.session_state.user_id,
                 session_id=conversation_id,
                 question=current["content"],
                 answer=following["content"],
@@ -540,7 +568,11 @@ def remove_saved_conversation(conversation_id):
 
     if success:
         get_recent_conversations.clear()
-        get_short_term_memory().clear_history(conversation_id)
+        # get_short_term_memory().clear_history(conversation_id)
+        get_short_term_memory().clear_history(
+            st.session_state.user_id,
+            conversation_id,
+        )
 
         if st.session_state.session_id == conversation_id:
             start_new_conversation()
@@ -556,15 +588,18 @@ def run_chat_question(question):
     """Run chat through FastAPI or direct local RAG mode."""
     if API_MODE:
         client = get_api_client()
-
         response = client.post(
             f"{API_BASE_URL}/ask",
-            json={
-                "question": question,
-                "session_id": st.session_state.session_id,
-                "user_id": st.session_state.user_id,
-            },
-        )
+            headers={
+                "Authorization": f"Bearer {google_id_token}",
+                },
+                json={
+                    "question": question,
+                    "session_id": st.session_state.session_id,
+                    },
+                )
+
+
 
         response.raise_for_status()
         data = response.json()
@@ -983,7 +1018,6 @@ def open_policy_manual():
 # SESSION STATE INITIALIZATION
 # ==========================================
 
-CHAT_USER_ID = "local-single-user"
 st.session_state.user_id = CHAT_USER_ID
 
 if "session_id" not in st.session_state:
@@ -1020,6 +1054,30 @@ st.caption(
 # ==========================================
 
 with st.sidebar:
+     # ==========================================
+    # AUTHENTICATED USER
+    # ==========================================
+
+    st.caption("SIGNED IN AS")
+
+    google_user_name = st.user.get("name", "Google User")
+    google_user_email = st.user.get("email", "")
+
+    st.markdown(f"**{google_user_name}**")
+
+    if google_user_email:
+        st.caption(google_user_email)
+
+    if st.button(
+        "Sign out",
+        icon=":material/logout:",
+        use_container_width=True,
+        key="google_sign_out",
+    ):
+        st.logout()
+
+    st.divider()
+
     # Sidebar contents
     st.subheader("Contents")
 

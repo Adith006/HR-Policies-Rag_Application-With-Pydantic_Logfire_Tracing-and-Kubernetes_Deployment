@@ -4,7 +4,9 @@ import os
 import secrets
 
 import logfire
-from fastapi import FastAPI, HTTPException,Header
+from fastapi import FastAPI, HTTPException, Header, Depends
+from google.oauth2 import id_token
+from google.auth.transport.requests import Request as GoogleRequest
 from pydantic import BaseModel, Field
 
 from app.rag_pipeline import answer_question
@@ -25,6 +27,53 @@ from app.rag_trace import capture_rag_trace
 logfire.configure(send_to_logfire="if-token-present")
 
 conversation_memory = ConversationMemory()
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+
+
+def verify_google_token(
+    authorization: str = Header(...),
+) -> str:
+    """Verify Google ID token and return the authenticated user ID."""
+
+    if not GOOGLE_CLIENT_ID:
+        raise HTTPException(
+            status_code=503,
+            detail="Google authentication is not configured.",
+        )
+
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid authorization header.",
+        )
+
+    token = authorization.removeprefix("Bearer ").strip()
+
+    if not token:
+        raise HTTPException(
+            status_code=401,
+            detail="Missing Google ID token.",
+        )
+
+    try:
+        claims = id_token.verify_oauth2_token(
+            token,
+            GoogleRequest(),
+            GOOGLE_CLIENT_ID,
+        )
+
+        user_id = claims.get("sub")
+
+        if not user_id or claims.get("email_verified") is not True:
+            raise ValueError("Google account identity is not verified.")
+
+        return user_id
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired Google authentication token.",
+        ) from exc
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -117,13 +166,18 @@ logfire.instrument_fastapi(
 )
 
 
+# class QuestionRequest(BaseModel):
+#     question: str = Field(..., min_length=1, max_length=2000)
+#     session_id: UUID = Field(
+#         description="Unique identifier for this conversation"
+#     )
+#     user_id: str = Field(..., min_length=1, max_length=255)
+
 class QuestionRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=2000)
     session_id: UUID = Field(
         description="Unique identifier for this conversation"
     )
-    user_id: str = Field(..., min_length=1, max_length=255)
-
 
 @app.get("/health")
 def health_check():
@@ -131,7 +185,7 @@ def health_check():
 
 
 @app.post("/ask")
-def ask_question(request: QuestionRequest):
+def ask_question(request: QuestionRequest,user_id: str = Depends(verify_google_token),):
     try:
         session_id = str(request.session_id)
 
@@ -139,7 +193,7 @@ def ask_question(request: QuestionRequest):
         if is_memory_eligible(request.question):
             saved_count = save_user_memories(
                 user_message=request.question,
-                user_id=request.user_id,
+                user_id= user_id,
                 session_id=session_id,
             )
 
@@ -167,7 +221,8 @@ def ask_question(request: QuestionRequest):
             }
 
         # Preserve existing conversation-history lookup.
-        history = conversation_memory.get_history(session_id)
+        # history = conversation_memory.get_history(session_id)
+        # history = conversation_memory.get_history(user_id, session_id)
 
         # Capture actual RAG pipeline execution stages.
         with capture_rag_trace() as trace_events:
@@ -175,7 +230,7 @@ def ask_question(request: QuestionRequest):
                 result = answer_question(
                     question=request.question,
                     session_id=session_id,
-                    user_id=request.user_id,
+                    user_id=user_id,
                 )
 
         if isinstance(result, dict):
@@ -200,11 +255,12 @@ def ask_question(request: QuestionRequest):
         else:
             raise ValueError("Unexpected RAG response format.")
 
-        conversation_memory.add_turn(
-            session_id=session_id,
-            question=request.question,
-            answer=answer,
-        )
+        # conversation_memory.add_turn(
+        #     user_id = user_id,
+        #     session_id=session_id,
+        #     question=request.question,
+        #     answer=answer,
+        # )
 
         # Include trace events in the FastAPI response.
         response_data["trace"] = trace_events
@@ -213,6 +269,7 @@ def ask_question(request: QuestionRequest):
 
     except ValueError as exc:
         raise HTTPException(
+
             status_code=400,
             detail=str(exc),
         ) from exc
