@@ -1,4 +1,4 @@
-﻿
+
 
 import hashlib
 import json
@@ -9,6 +9,8 @@ from pathlib import Path
 
 import streamlit as st
 from dotenv import load_dotenv
+import jwt
+from datetime import datetime, timedelta, timezone
 
 # Resolve project root before importing project modules.
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -40,15 +42,18 @@ if not st.user.is_logged_in:
 
     st.stop()
 
-# Retrieve verified identity and ID token from Streamlit OIDC.
-google_user_id = st.user.get("sub")
-google_id_token = st.user.tokens.get("id")
 
-if not google_user_id or not google_id_token:
+
+google_user_id = st.user.get("sub")
+google_email_verified = st.user.get("email_verified", False)
+
+if not google_user_id or google_email_verified is not True:
     st.error("Authentication failed. Please sign in again.")
     st.stop()
 
 CHAT_USER_ID = str(google_user_id)
+
+
 
 # Style the Ragas panel as a right-hand sidebar.
 st.markdown(
@@ -587,6 +592,20 @@ def remove_saved_conversation(conversation_id):
 def run_chat_question(question):
     """Run chat through FastAPI or direct local RAG mode."""
     if API_MODE:
+
+        auth_now = datetime.now(timezone.utc)
+        google_id_token = jwt.encode(
+            {
+                "sub": CHAT_USER_ID,
+                "email_verified": True,
+                "iss": "enterprise-hr-assistant",
+                "aud": "enterprise-hr-api",
+                "iat": auth_now,
+                "exp": auth_now + timedelta(seconds=90),
+                },
+                st.secrets["STREAMLIT_AUTH_SECRET"],
+                algorithm="HS256",
+                )
         client = get_api_client()
         response = client.post(
             f"{API_BASE_URL}/ask",

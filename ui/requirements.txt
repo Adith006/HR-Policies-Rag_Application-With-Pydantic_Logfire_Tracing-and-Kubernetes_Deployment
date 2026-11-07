@@ -17,3 +17,4 @@ ragas==0.3.1
 langchain-community==0.4.1
 langchain-openai==1.7.2
 pandas>=2.2,<3.0
+PyJWT>=2.10,<3

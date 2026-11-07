@@ -5,8 +5,10 @@ import secrets
 
 import logfire
 from fastapi import FastAPI, HTTPException, Header, Depends
-from google.oauth2 import id_token
-from google.auth.transport.requests import Request as GoogleRequest
+# from google.oauth2 import id_token
+# from google.auth.transport.requests import Request as GoogleRequest
+import jwt
+from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel, Field
 
 from app.rag_pipeline import answer_question
@@ -27,18 +29,24 @@ from app.rag_trace import capture_rag_trace
 logfire.configure(send_to_logfire="if-token-present")
 
 conversation_memory = ConversationMemory()
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+# GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+
+
+STREAMLIT_AUTH_SECRET = os.getenv("STREAMLIT_AUTH_SECRET")
+
+AUTH_ISSUER = "enterprise-hr-assistant"
+AUTH_AUDIENCE = "enterprise-hr-api"
 
 
 def verify_google_token(
     authorization: str = Header(...),
 ) -> str:
-    """Verify Google ID token and return the authenticated user ID."""
+    """Verify the signed identity assertion issued by Streamlit."""
 
-    if not GOOGLE_CLIENT_ID:
+    if not STREAMLIT_AUTH_SECRET:
         raise HTTPException(
             status_code=503,
-            detail="Google authentication is not configured.",
+            detail="Application authentication is not configured.",
         )
 
     if not authorization.startswith("Bearer "):
@@ -52,27 +60,48 @@ def verify_google_token(
     if not token:
         raise HTTPException(
             status_code=401,
-            detail="Missing Google ID token.",
+            detail="Missing authentication token.",
         )
 
     try:
-        claims = id_token.verify_oauth2_token(
+        claims = jwt.decode(
             token,
-            GoogleRequest(),
-            GOOGLE_CLIENT_ID,
+            STREAMLIT_AUTH_SECRET,
+            algorithms=["HS256"],
+            issuer=AUTH_ISSUER,
+            audience=AUTH_AUDIENCE,
+            options={
+                "require": [
+                    "exp",
+                    "iat",
+                    "sub",
+                    "iss",
+                    "aud",
+                    "email_verified",
+                ]
+            },
         )
 
         user_id = claims.get("sub")
 
-        if not user_id or claims.get("email_verified") is not True:
-            raise ValueError("Google account identity is not verified.")
+        if not user_id:
+            raise ValueError("Missing authenticated user identity.")
+
+        if claims.get("email_verified") is not True:
+            raise ValueError("User email is not verified.")
 
         return user_id
 
-    except Exception as exc:
+    except jwt.InvalidTokenError as exc:
         raise HTTPException(
             status_code=401,
-            detail="Invalid or expired Google authentication token.",
+            detail="Invalid or expired authentication token.",
+        ) from exc
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid user identity.",
         ) from exc
 
 @asynccontextmanager

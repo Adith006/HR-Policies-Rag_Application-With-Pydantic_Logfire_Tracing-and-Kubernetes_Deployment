@@ -30,7 +30,7 @@ redis
 celery
 
 # Authentication and security
-PyJWT
+PyJWT>=2.10,<3
 pwdlib[argon2]
 
 # Tracing and monitoring
