@@ -43,15 +43,13 @@ if not os.getenv("DATABASE_URL"):
         "DATABASE_URL is missing. Configure it in Streamlit Cloud Secrets."
     )
 
-# Application imports must come AFTER configuration
 from app.conversation_store import get_messages
 
-
 # Safe diagnostic: never print the actual database URL
-st.write(
-    "Database configuration loaded:",
-    bool(os.getenv("DATABASE_URL"))
-)
+# st.write(
+#     "Database configuration loaded:",
+#     bool(os.getenv("DATABASE_URL"))
+# )
 
 # Only now import application modules
 import jwt
@@ -63,8 +61,8 @@ try:
     if secret_exists and not os.getenv("DATABASE_URL"):
         os.environ["DATABASE_URL"] = str(st.secrets["DATABASE_URL"])
 
-    st.write("Streamlit secret exists:", secret_exists)
-    st.write("Environment variable loaded:", bool(os.getenv("DATABASE_URL")))
+    # st.write("Streamlit secret exists:", secret_exists)
+    # st.write("Environment variable loaded:", bool(os.getenv("DATABASE_URL")))
 
 except Exception as exc:
     st.error(f"Secret loading failed: {type(exc).__name__}: {exc}")
