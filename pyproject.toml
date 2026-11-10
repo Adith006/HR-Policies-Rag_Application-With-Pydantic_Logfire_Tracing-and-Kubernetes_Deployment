@@ -41,6 +41,7 @@ evaluation = [
     "ragas==0.4.3",
     "langchain-community<0.4.2",
     "langchain-openai",
+    "pytest>=9.2.0",
 ]
 
 [tool.uv.sources]
