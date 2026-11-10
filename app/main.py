@@ -574,5 +574,5 @@ def evaluate_ragas(
 
         raise HTTPException(
             status_code=500,
-            detail=f"{type(exc).__name__}: {exc}",
+            detail="The request could not be completed. Please try again later.",
         ) from exc

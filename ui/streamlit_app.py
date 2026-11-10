@@ -7,7 +7,7 @@ import sys
 import uuid
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
-
+from ui.error_messages import user_facing_error_message
 import jwt
 import streamlit as st
 from dotenv import load_dotenv
@@ -1065,7 +1065,10 @@ def display_ragas_dashboard():
             import traceback
 
             traceback.print_exc()
-            st.session_state.ragas_error = type(exc).__name__
+            st.session_state.ragas_error = user_facing_error_message(
+                exc,
+                operation="evaluation",
+                )
             st.session_state.pop("ragas_report", None)
 
     # Clear cached evaluation
@@ -1083,14 +1086,9 @@ def display_ragas_dashboard():
         "Identical evaluations are cached for up to one hour. "
         "Clear the cache to force a fresh evaluation."
     )
-
-    # Display errors
+    # Display user-friendly evaluation errors
     if st.session_state.get("ragas_error"):
-        st.error(
-            f"Evaluation failed: {st.session_state.ragas_error}. "
-            "Check the application logs."
-        )
-
+        st.error(st.session_state.ragas_error)
     report = st.session_state.get("ragas_report")
 
     if not report:
@@ -1523,10 +1521,7 @@ with chat_column:
 
                         assistant_message = {
                             "role": "assistant",
-                            "content": (
-                                f"Unable to generate an answer "
-                                f"({type(exc).__name__}): {str(exc)}"
-                            ),
+                            "content": user_facing_error_message(exc),
                             "sources": [],
                             "retrieved_contexts": [],
                             "cache": None,
