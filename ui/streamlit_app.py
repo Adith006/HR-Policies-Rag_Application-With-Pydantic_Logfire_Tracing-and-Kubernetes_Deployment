@@ -260,7 +260,7 @@ def display_trace(events):
 
         if denied:
             st.info(
-                "Request denied by guardrails. "
+                "Request denied "
                 "Cache bypassed and answer generation skipped."
             )
         elif failed:
