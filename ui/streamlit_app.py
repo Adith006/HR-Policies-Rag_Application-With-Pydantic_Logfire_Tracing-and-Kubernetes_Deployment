@@ -7,15 +7,17 @@ import sys
 import uuid
 from pathlib import Path
 
+
+# Resolve project root before importing project modules.
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
+
 import streamlit as st
 from dotenv import load_dotenv
 import jwt
 from datetime import datetime, timedelta, timezone
 from app.conversation_store import get_messages
 
-# Resolve project root before importing project modules.
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(PROJECT_ROOT))
 
 # Load local environment configuration.
 load_dotenv(PROJECT_ROOT / ".env")
