@@ -30,6 +30,10 @@ jobs:
     env:
       REDIS_URL: redis://localhost:6379/0
       DATABASE_URL: postgresql://test:test@localhost:5432/test_db
+      # LLM configuration for test collection
+      PORTKEY_API_KEY: ci-test-placeholder
+      GROQ_MODEL: ci-test-groq-model
+      OPENAI_MODEL: ci-test-openai-model
 
     steps:
       - name: Checkout repository
