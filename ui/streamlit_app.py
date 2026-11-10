@@ -21,6 +21,17 @@ if str(PROJECT_ROOT) not in sys.path:
 # Load local environment variables
 load_dotenv(PROJECT_ROOT / ".env")
 
+# Load Streamlit Cloud secrets into environment variables
+SECRET_KEYS = (
+    "DATABASE_URL",
+    "STREAMLIT_AUTH_SECRET",
+    "EVALUATION_API_TOKEN",
+)
+
+for key in SECRET_KEYS:
+    if not os.getenv(key) and key in st.secrets:
+        os.environ[key] = str(st.secrets[key])
+
 # Load Streamlit Cloud secrets
 if not os.getenv("DATABASE_URL"):
     if "DATABASE_URL" in st.secrets:
