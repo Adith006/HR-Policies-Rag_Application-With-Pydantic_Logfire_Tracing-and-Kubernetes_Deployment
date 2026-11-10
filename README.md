@@ -448,3 +448,355 @@ Instrumentation covers important stages of the RAG workflow, including:
 - RAGAS evaluation.
 
 ### Benefits
+
+- Identify failures within individual pipeline stages.
+- Understand request execution flow.
+- Monitor operation latency.
+- Inspect retrieval and generation behaviour.
+- Diagnose API and evaluation failures.
+- Improve application reliability.
+
+Logfire traces should be configured to avoid exposing API keys, database credentials, and sensitive user information.
+
+---
+
+## 12. Technology Stack
+
+| Category | Technologies |
+|---|---|
+| Programming Language | Python |
+| Backend Framework | FastAPI |
+| Frontend Framework | Streamlit |
+| Relational Database | Neon PostgreSQL |
+| Vector Database Extension | pgvector |
+| Cache and Memory | Upstash Redis |
+| Embedding Models | Sentence Transformers / configured embedding model |
+| Reranking | Cross-Encoder |
+| LLM Integration | Configured external LLM providers |
+| Evaluation | RAGAS |
+| Observability | Pydantic Logfire |
+| API Communication | HTTPX |
+| Containerization | Docker |
+| Reverse Proxy | Caddy |
+| CI/CD | GitHub Actions |
+| Container Registry | GitHub Container Registry |
+| Backend Hosting | Oracle Cloud Infrastructure |
+| Frontend Hosting | Streamlit Community Cloud |
+
+---
+
+## 13. Deployment Architecture
+
+The current production application uses a distributed cloud deployment.
+
+### Backend: Oracle Cloud Infrastructure
+
+The Oracle Cloud VM hosts the containerized backend infrastructure.
+
+The deployed services include:
+
+**FastAPI API**
+- Handles incoming requests.
+- Executes RAG pipeline operations.
+- Connects to database and memory services.
+- Provides health and evaluation endpoints.
+
+**Caddy Reverse Proxy**
+- Acts as the public reverse proxy.
+- Handles HTTPS and forwards traffic to the API service.
+
+**Containerized Services**
+- Docker manages the deployed application containers.
+- Docker Compose manages the production service configuration.
+
+### Frontend: Streamlit Community Cloud
+
+The Streamlit application is deployed independently.
+
+It provides:
+
+- User authentication and application access.
+- HR policy question answering.
+- Conversation history.
+- RAGAS evaluation dashboard.
+
+The UI communicates with the Oracle-hosted FastAPI backend over HTTPS.
+
+### Managed Infrastructure
+
+The application uses:
+
+- Neon PostgreSQL for persistent storage and vector retrieval.
+- Upstash Redis for memory and caching.
+- Pydantic Logfire for observability.
+
+### Live Application
+
+**Streamlit Application:**  
+https://enterprise-hr-assistant.streamlit.app/
+
+**FastAPI Backend:**  
+https://hr-policies-api.duckdns.org
+
+---
+
+## 14. CI/CD Pipeline
+
+GitHub Actions automates application validation, container image creation, publishing, and deployment.
+
+### Deployment Lifecycle
+
+\`\`\`mermaid
+flowchart TD
+    A[Developer Pushes Code to GitHub] --> B[GitHub Actions Triggered]
+
+    B --> C[Dependency Installation]
+    C --> D[Automated Test Suite]
+
+    D -->|Tests Pass| E[Build API Docker Image]
+    D -->|Tests Pass| F[Build UI Docker Image]
+
+    E --> G[Push Images to GHCR]
+    F --> G
+
+    G --> H[Deploy to Oracle Cloud]
+    H --> I[Pull Versioned Images]
+    I --> J[Update Docker Compose Deployment]
+    J --> K[Restart / Reconcile Services]
+    K --> L[Health Check]
+    L --> M[Production Application]
+\`\`\`
+
+### CI/CD Stages
+
+**1. Source Control**
+
+Code changes are committed and pushed to the GitHub repository.
+
+**2. Automated Validation**
+
+GitHub Actions installs the configured dependencies and executes automated tests.
+
+**3. Docker Image Build**
+
+The API and UI images are built after validation succeeds.
+
+**4. Image Publishing**
+
+Images are published to GitHub Container Registry with commit-based version tags.
+
+**5. Oracle Deployment**
+
+The deployment workflow connects to the Oracle VM and updates the deployment configuration and container images.
+
+**6. Health Verification**
+
+The deployed API is checked using its health endpoint.
+
+### Benefits
+
+- Consistent deployment process.
+- Automated regression testing.
+- Version-controlled container images.
+- Reproducible deployment revisions.
+- Reduced manual deployment work.
+- Easier rollback to a previous image revision.
+
+The currently verified production hosting path is Docker-based on Oracle Cloud. Kubernetes-related deployment configuration, where present in the repository, should be treated separately from this live Docker deployment.
+
+---
+
+## 15. Environment Configuration
+
+Application configuration is supplied through environment variables and platform secret management.
+
+Depending on the enabled services, configuration includes:
+
+| Configuration | Purpose |
+|---|---|
+| `DATABASE_URL` | Neon PostgreSQL connection |
+| `REDIS_URL` | Upstash Redis connection |
+| `STREAMLIT_AUTH_SECRET` | Shared authentication configuration |
+| `EVALUATION_API_TOKEN` | Evaluation endpoint authentication |
+| `PORTKEY_API_KEY` | Model gateway authentication, where configured |
+| `GROQ_MODEL` | Configured Groq model identifier |
+| `OPENAI_MODEL` | Configured OpenAI model identifier |
+| Logfire configuration | Observability and tracing |
+| Model credentials | Authentication for configured model providers |
+
+Refer to the application's settings and deployment files for the exact required variables.
+
+**Security rule:** Never commit real credentials, database URLs, API keys, tokens, or private SSH keys to GitHub.
+
+Use local environment files for development and the hosting platforms' secret-management features for production.
+
+Rotate any credential that has been exposed in logs, screenshots, terminal output, or source control.
+
+---
+
+## 16. Local Development
+
+### Prerequisites
+
+- Python version supported by the repository.
+- Existing project dependency environment.
+- Git.
+- Docker and Docker Compose, when running the containerized stack.
+- Access to the configured Neon PostgreSQL database.
+- Access to the configured Upstash Redis instance.
+- Valid credentials for configured LLM providers and observability services.
+
+### Clone the Repository
+
+\`\`\`bash
+git clone https://github.com/Adith006/HR-Policies-Rag_Application-With-Pydantic_Logfire_Tracing-and_Kubernetes_Deployment.git
+
+cd HR-Policies-Rag_Application-With-Pydantic_Logfire_Tracing-and_Kubernetes_Deployment
+\`\`\`
+
+### Configure Environment Variables
+
+Configure the required variables using the repository's environment example and application settings.
+
+Do not put production secrets into source control.
+
+### Install Dependencies
+
+Use the dependency manager and lock file provided by the repository to install the application and development dependencies.
+
+### Start the Containerized Application
+
+Where the repository's Compose configuration is intended for local execution:
+
+\`\`\`bash
+docker compose up -d --build
+\`\`\`
+
+Check service status:
+
+\`\`\`bash
+docker compose ps
+\`\`\`
+
+Follow logs:
+
+\`\`\`bash
+docker compose logs -f
+\`\`\`
+
+Stop the local stack:
+
+\`\`\`bash
+docker compose down
+\`\`\`
+
+Use the actual environment configuration and Compose file for the deployment target you are running. The production database and Redis services are externally managed.
+
+---
+
+## 17. API and Application Access
+
+### Health Endpoint
+
+\`\`\`http
+GET /health
+\`\`\`
+
+Used to verify API availability.
+
+### Conversation Operations
+
+The application exposes conversation operations, including conversation listing and persisted message retrieval.
+
+### RAG Question Answering
+
+The question-answering API accepts requests from the Streamlit application and executes the RAG pipeline.
+
+### RAGAS Evaluation
+
+\`\`\`http
+POST /evaluate
+\`\`\`
+
+Executes the configured RAGAS evaluation workflow.
+
+The endpoint uses its configured authentication requirements.
+
+For exact request schemas, parameters, authentication headers, and response structures, refer to the FastAPI route and schema definitions in the source code.
+
+---
+
+## 18. Security Considerations
+
+This application works with organizational policy content and user conversation data. Production deployments should maintain the following controls:
+
+- Store credentials in secret-management systems.
+- Enforce authentication on protected API endpoints.
+- Validate user ownership for conversation access.
+- Use HTTPS for external requests.
+- Treat retrieved document instructions as untrusted content.
+- Validate generated answers against retrieved policy context.
+- Protect database and Redis credentials.
+- Avoid logging secrets or unnecessary personal information.
+- Review access permissions for managed services.
+- Maintain backups and recovery procedures.
+- Rotate credentials after accidental exposure.
+
+Guardrails, logging, and evaluation are complementary controls. They do not replace application security testing or human review of important HR decisions.
+
+---
+
+## 19. Future Improvements
+
+Potential areas for continued development include:
+
+- More comprehensive document-ingestion monitoring and error handling.
+- Improved retrieval benchmarking across different HR policy categories.
+- Expanded evaluation datasets for ambiguous and complex questions.
+- More detailed citation correctness evaluation.
+- Retrieval and generation latency optimization.
+- Token usage and LLM cost monitoring.
+- Automated cleanup of synthetic evaluation sessions and memory.
+- More comprehensive rate limiting and abuse prevention.
+- Improved operational alerting and service monitoring.
+- Document versioning and re-indexing workflows.
+- Additional authorization and governance controls.
+
+These are potential improvements and should not be interpreted as features already completed.
+
+---
+
+## Project Status
+
+The HR Policies RAG Application has been deployed with:
+
+- A containerized FastAPI backend on Oracle Cloud.
+- A Streamlit frontend on Streamlit Community Cloud.
+- Neon PostgreSQL with pgvector.
+- Upstash Redis for memory and cache operations.
+- Semantic retrieval and cross-encoder reranking.
+- LLM-based answer generation.
+- Conversation history and persistence.
+- Guardrails and source construction.
+- RAGAS evaluation.
+- Pydantic Logfire tracing.
+- GitHub Actions CI/CD and GitHub Container Registry.
+
+The production workflow has been exercised end to end, including document retrieval, answer generation, conversation operations, and successful RAGAS evaluation.
+
+---
+
+## Repository
+
+**GitHub:**  
+https://github.com/Adith006/HR-Policies-Rag_Application-With-Pydantic_Logfire_Tracing-and_Kubernetes_Deployment
+
+**Live Application:**  
+https://enterprise-hr-assistant.streamlit.app/
+
+**Backend API:**  
+https://hr-policies-api.duckdns.org
+
+---
+
+*Built as an end-to-end applied AI engineering project focused on enterprise RAG, retrieval quality, conversational memory, security, evaluation, observability, and production deployment.*
