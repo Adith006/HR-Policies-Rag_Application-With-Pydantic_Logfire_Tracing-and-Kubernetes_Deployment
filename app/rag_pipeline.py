@@ -301,6 +301,7 @@ def answer_question(
     question: str,
     session_id: str,
     user_id: str,
+    restore_persisted_history: bool = True,
 ) -> dict:
     """
     Answer a question using RAG, guardrails, caching,
@@ -380,11 +381,11 @@ def answer_question(
     # ============================================================
     # 2. SHORT-TERM MEMORY RETRIEVAL
     # ============================================================
-
-    restore_conversation_memory(
-    user_id=user_id,
-    session_id=session_id,
-    )
+    if restore_persisted_history:
+        restore_conversation_memory(
+        user_id=user_id,
+        session_id=session_id,
+        )
 
     with trace_stage("Short-term memory retrieval") as trace:
 

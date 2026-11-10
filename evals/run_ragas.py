@@ -198,6 +198,7 @@ def build_evaluator():
 
     return evaluator_llm, evaluator_embeddings
 
+
 def collect_pipeline_result(
     question: str,
     include_details: bool = False,
@@ -211,6 +212,10 @@ def collect_pipeline_result(
         results = original_search(**kwargs)
         captured["results"] = results
         return results
+
+    # Create a unique synthetic evaluation session.
+    session_id = str(uuid4())
+    user_id = f"ragas-evaluation-{uuid4().hex}"
 
     with (
         patch.object(
@@ -232,8 +237,10 @@ def collect_pipeline_result(
             "get_cached_answer",
             return_value=None,
         ),
-        patch.object(rag_pipeline, "cache_answer"),
-        # patch.object(rag_pipeline, "save_long_term_memories"),
+        patch.object(
+            rag_pipeline,
+            "cache_answer",
+        ),
         patch.object(
             rag_pipeline,
             "semantic_search",
@@ -242,15 +249,16 @@ def collect_pipeline_result(
     ):
         result = rag_pipeline.answer_question(
             question=question,
-            session_id=str(uuid4()),
-            user_id=f"ragas-evaluation-{uuid4().hex}",
+            session_id=session_id,
+            user_id=user_id,
+            restore_persisted_history=False,
         )
 
     raw_results = captured.get("results", [])
 
     retrieved_items = [
         (item, item["context_text"].strip())
-        for item in raw_results
+        for item in raw_resultsc
         if isinstance(item.get("context_text"), str)
         and item["context_text"].strip()
     ]
@@ -286,9 +294,8 @@ def collect_pipeline_result(
     if include_details:
         return answer, contexts, sources
 
-    # Preserve compatibility with your existing diagnostic scripts.
+    # Preserve compatibility with existing diagnostic scripts.
     return answer, contexts
-
 
 
 
