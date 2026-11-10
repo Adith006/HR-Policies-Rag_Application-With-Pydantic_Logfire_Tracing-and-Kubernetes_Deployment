@@ -536,7 +536,7 @@ The application uses:
 https://enterprise-hr-assistant.streamlit.app/
 
 **FastAPI Backend:**  
-https://hr-policies-api.duckdns.org
+https://hr-policies-api.duckdns.org/docs
 
 ---
 
