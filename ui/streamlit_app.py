@@ -5,37 +5,10 @@ import json
 import os
 import sys
 import uuid
-# from pathlib import Path
-
-
-# # Resolve project root before importing project modules.
-# PROJECT_ROOT = Path(__file__).resolve().parents[1]
-# sys.path.insert(0, str(PROJECT_ROOT))
-
-# import streamlit as st
-# from dotenv import load_dotenv
-# import jwt
-# from datetime import datetime, timedelta, timezone
-# from app.conversation_store import get_messages
-
-
-# # Load local environment configuration.
-# load_dotenv(PROJECT_ROOT / ".env")
-
 from pathlib import Path
+from datetime import datetime, timedelta, timezone
 
-from dotenv import load_dotenv
-import streamlit as st
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
-import os
-import sys
-from pathlib import Path
-
+import jwt
 import streamlit as st
 from dotenv import load_dotenv
 
@@ -45,15 +18,23 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-# Load local environment
+# Load local environment variables
 load_dotenv(PROJECT_ROOT / ".env")
 
 # Load Streamlit Cloud secrets
-try:
-    if not os.getenv("DATABASE_URL") and "DATABASE_URL" in st.secrets:
+if not os.getenv("DATABASE_URL"):
+    if "DATABASE_URL" in st.secrets:
         os.environ["DATABASE_URL"] = str(st.secrets["DATABASE_URL"])
-except Exception:
-    pass
+
+# Validate configuration before importing application modules
+if not os.getenv("DATABASE_URL"):
+    raise RuntimeError(
+        "DATABASE_URL is missing. Configure it in Streamlit Cloud Secrets."
+    )
+
+# Application imports must come AFTER configuration
+from app.conversation_store import get_messages
+
 
 # Safe diagnostic: never print the actual database URL
 st.write(
@@ -64,6 +45,18 @@ st.write(
 # Only now import application modules
 import jwt
 from datetime import datetime, timedelta, timezone
+# Diagnose Streamlit database configuration
+try:
+    secret_exists = "DATABASE_URL" in st.secrets
+
+    if secret_exists and not os.getenv("DATABASE_URL"):
+        os.environ["DATABASE_URL"] = str(st.secrets["DATABASE_URL"])
+
+    st.write("Streamlit secret exists:", secret_exists)
+    st.write("Environment variable loaded:", bool(os.getenv("DATABASE_URL")))
+
+except Exception as exc:
+    st.error(f"Secret loading failed: {type(exc).__name__}: {exc}")
 
 from app.conversation_store import get_messages
 
