@@ -11,6 +11,7 @@ import streamlit as st
 from dotenv import load_dotenv
 import jwt
 from datetime import datetime, timedelta, timezone
+from app.conversation_store import get_messages
 
 # Resolve project root before importing project modules.
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -403,33 +404,87 @@ def get_api_client():
     )
 
 
-@st.cache_resource(show_spinner=False)
-def get_conversation_store():
-    """Load persistent conversation storage functions."""
-    from app.conversation_store import (
-        create_conversation,
-        save_message,
-        get_conversations,
-        get_messages,
-        set_conversation_pinned,
-        delete_conversation,
+# @st.cache_resource(show_spinner=False)
+# def get_conversation_store():
+#     """Load persistent conversation storage functions."""
+#     from app.conversation_store import (
+#         create_conversation,
+#         save_message,
+#         get_conversations,
+#         get_messages,
+#         set_conversation_pinned,
+#         delete_conversation,
+#     )
+
+#     return {
+#         "create": create_conversation,
+#         "save": save_message,
+#         "list": get_conversations,
+#         "messages": get_messages,
+#         "pin": set_conversation_pinned,
+#         "delete": delete_conversation,
+#     }
+
+def get_api_headers():
+    """Create authentication headers for FastAPI."""
+    auth_now = datetime.now(timezone.utc)
+
+    token = jwt.encode(
+        {
+            "sub": CHAT_USER_ID,
+            "email_verified": True,
+            "iss": "enterprise-hr-assistant",
+            "aud": "enterprise-hr-api",
+            "iat": auth_now,
+            "exp": auth_now + timedelta(seconds=90),
+        },
+        st.secrets["STREAMLIT_AUTH_SECRET"],
+        algorithm="HS256",
     )
 
     return {
-        "create": create_conversation,
-        "save": save_message,
-        "list": get_conversations,
-        "messages": get_messages,
-        "pin": set_conversation_pinned,
-        "delete": delete_conversation,
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json",
     }
+
+def api_request(method, endpoint, **kwargs):
+    """Send an authenticated request to FastAPI."""
+
+    response = get_api_client().request(
+        method,
+        f"{API_BASE_URL}{endpoint}",
+        headers=get_api_headers(),
+        **kwargs,
+    )
+
+    response.raise_for_status()
+
+    if response.content:
+        return response.json()
+
+    return {}
 
 
 @st.cache_data(ttl=30, max_entries=20, show_spinner=False)
 def get_recent_conversations(user_id: str, limit: int = 50):
-    """Cache conversation metadata briefly to reduce repeated Neon reads."""
-    store = get_conversation_store()
-    return store["list"](user_id=user_id, limit=limit)
+    """Retrieve conversation history from the active application mode."""
+
+    if API_MODE:
+        data = api_request(
+            "GET",
+            "/conversations",
+            params={"limit": limit},
+        )
+
+        return data.get("conversations", [])
+
+    # Use the local database in direct development mode.
+    from app.conversation_store import get_conversations
+
+    return get_conversations(
+        user_id=user_id,
+        limit=limit,
+    )
 
 
 @st.cache_resource(show_spinner=False)
@@ -448,21 +503,24 @@ def start_new_conversation():
 
 
 def persist_conversation_message(message):
-    """Save each message exactly once in Neon."""
+    """Save messages locally only when running outside API mode."""
 
-    store = get_conversation_store()
+    if API_MODE:
+        return
+
+    from app.conversation_store import (
+        create_conversation,
+        save_message,
+    )
 
     conversation_id = st.session_state.session_id
     user_id = st.session_state.user_id
 
-    # Create the conversation when its first message arrives.
-    if not st.session_state.get("conversation_initialized", False):
-        store["create"](
-            user_id=user_id,
-            conversation_id=conversation_id,
-        )
-
-        st.session_state.conversation_initialized = True
+    # Ensure the conversation exists before saving its message.
+    create_conversation(
+        user_id=user_id,
+        conversation_id=conversation_id,
+    )
 
     metadata = {}
 
@@ -471,10 +529,12 @@ def persist_conversation_message(message):
             "sources": message.get("sources", []),
             "cache": message.get("cache"),
             "trace": message.get("trace", []),
-            "retrieved_contexts": message.get("retrieved_contexts", []),
+            "retrieved_contexts": message.get(
+                "retrieved_contexts", []
+            ),
         }
 
-    store["save"](
+    save_message(
         conversation_id=conversation_id,
         user_id=user_id,
         role=message["role"],
@@ -482,19 +542,27 @@ def persist_conversation_message(message):
         metadata=metadata,
     )
 
-    # The cached sidebar list must reflect the latest message count/title.
     get_recent_conversations.clear()
 
-
 def load_saved_conversation(conversation_id):
-    """Load a saved conversation and restore its Redis memory."""
+    """Load a saved conversation using the active application mode."""
 
-    store = get_conversation_store()
+    if API_MODE:
+        # Load messages through FastAPI.
+        data = api_request(
+            "GET",
+            f"/conversations/{conversation_id}/messages",
+        )
+        saved_messages = data.get("messages", [])
 
-    saved_messages = store["messages"](
-        conversation_id=conversation_id,
-        user_id=st.session_state.user_id,
-    )
+    else:
+        # Load messages directly from the local database.
+        from app.conversation_store import get_messages
+
+        saved_messages = get_messages(
+            conversation_id=conversation_id,
+            user_id=st.session_state.user_id,
+        )
 
     st.session_state.session_id = conversation_id
     st.session_state.messages = []
@@ -512,82 +580,95 @@ def load_saved_conversation(conversation_id):
                 "sources": metadata.get("sources", []),
                 "cache": metadata.get("cache"),
                 "trace": metadata.get("trace", []),
-                "retrieved_contexts": metadata.get("retrieved_contexts", []),
+                "retrieved_contexts": metadata.get(
+                    "retrieved_contexts", []
+                ),
             })
 
         st.session_state.messages.append(restored_message)
 
-    # Restore the recent conversation turns into Redis.
-    memory = get_short_term_memory()
-    # memory.clear_history(conversation_id)
-    memory.clear_history(
-        st.session_state.user_id,
-        conversation_id,
-        )
-
-    for index in range(len(saved_messages) - 1):
-        current = saved_messages[index]
-        following = saved_messages[index + 1]
-
-        if (
-            current["role"] == "user"
-            and following["role"] == "assistant"
-        ):
-            memory.add_turn(
-                user_id=st.session_state.user_id,
-                session_id=conversation_id,
-                question=current["content"],
-                answer=following["content"],
-            )
-
     st.session_state.conversation_initialized = True
     st.rerun()
 
-
 def toggle_conversation_pin(conversation):
-    """Pin or unpin a conversation."""
+    """Pin or unpin using the active application mode."""
 
-    store = get_conversation_store()
+    new_pin_state = not conversation["is_pinned"]
 
-    success = store["pin"](
-        conversation_id=conversation["id"],
-        user_id=st.session_state.user_id,
-        is_pinned=not conversation["is_pinned"],
-    )
+    try:
+        if API_MODE:
+            # Update through FastAPI.
+            api_request(
+                "PATCH",
+                f"/conversations/{conversation['id']}/pin",
+                json={"is_pinned": new_pin_state},
+            )
 
-    if success:
+        else:
+            # Update directly in the local database.
+            from app.conversation_store import set_conversation_pinned
+
+            updated = set_conversation_pinned(
+                conversation_id=conversation["id"],
+                user_id=st.session_state.user_id,
+                is_pinned=new_pin_state,
+            )
+
+            if not updated:
+                raise RuntimeError("Conversation was not found.")
+
+        # Refresh the sidebar history.
         get_recent_conversations.clear()
-    else:
-        st.warning("Unable to update the conversation pin.")
+
+    except Exception as exc:
+        st.error(f"Unable to update conversation pin: {exc}")
 
     st.rerun()
 
 
 def remove_saved_conversation(conversation_id):
-    """Permanently delete a conversation and its Redis history."""
+    """Delete a conversation using the active application mode."""
 
-    store = get_conversation_store()
+    try:
+        if API_MODE:
+            # Delete through FastAPI.
+            api_request(
+                "DELETE",
+                f"/conversations/{conversation_id}",
+            )
+        else:
+            # Delete directly in local development mode.
+            from app.conversation_store import delete_conversation
 
-    success = store["delete"](
-        conversation_id=conversation_id,
-        user_id=st.session_state.user_id,
-    )
+            deleted = delete_conversation(
+                conversation_id=conversation_id,
+                user_id=st.session_state.user_id,
+            )
 
-    if success:
+            if not deleted:
+                raise RuntimeError("Conversation was not found.")
+
+            # Clear Redis history in direct mode.
+            from app.memory import ConversationMemory
+
+            memory = ConversationMemory()
+            memory.clear_history(
+                st.session_state.user_id,
+                conversation_id,
+            )
+
         get_recent_conversations.clear()
-        # get_short_term_memory().clear_history(conversation_id)
-        get_short_term_memory().clear_history(
-            st.session_state.user_id,
-            conversation_id,
-        )
 
         if st.session_state.session_id == conversation_id:
-            start_new_conversation()
+            st.session_state.session_id = str(uuid.uuid4())
+            st.session_state.messages = []
+            st.session_state.conversation_initialized = False
 
         st.session_state.pop("pending_delete_id", None)
         st.rerun()
-    else:
-        st.error("Conversation not found or could not be deleted.")
+
+    except Exception as exc:
+        st.error(f"Unable to delete conversation: {exc}")
 
 
 
@@ -1356,7 +1437,17 @@ with chat_column:
                 ):
                     try:
                         # Persist the user's message before executing RAG.
-                        persist_conversation_message(user_message)
+                        if API_MODE:
+                            if not st.session_state.get("conversation_initialized", False):
+                                api_request(
+                                    "POST",
+                                    "/conversations",
+                                    json={"conversation_id": st.session_state.session_id,
+                                        },
+                                        )
+                                st.session_state.conversation_initialized = True
+                        else:
+                            persist_conversation_message(user_message)
 
                         data, trace_events = run_chat_question(question)
                         answer = data.get("answer")
@@ -1407,7 +1498,7 @@ with chat_column:
                 "The answer was generated, but the conversation history "
                 f"could not be saved: {type(save_exc).__name__}."
             )
-
+        get_recent_conversations.clear()
         st.rerun()
 
     else:

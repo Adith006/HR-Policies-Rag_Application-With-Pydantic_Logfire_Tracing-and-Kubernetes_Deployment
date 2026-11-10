@@ -17,9 +17,47 @@ from app.memory_store import search_memories, store_memory
 from app.retrieval.search import semantic_search
 from app.rag_trace import trace_stage
 import re
+from app.conversation_store import get_messages
 
 
 conversation_memory = ConversationMemory()
+
+def restore_conversation_memory(
+    user_id: str,
+    session_id: str,
+) -> None:
+    """Restore previous conversation turns from Neon into Redis."""
+
+    # Avoid duplicating turns if Redis already has conversation history.
+    existing_history = conversation_memory.get_history(
+        user_id,
+        session_id,
+    )
+
+    if existing_history:
+        return
+
+    # Retrieve persisted messages from Neon.
+    saved_messages = get_messages(
+        conversation_id=session_id,
+        user_id=user_id,
+    )
+
+    pending_question = None
+
+    for message in saved_messages:
+        if message["role"] == "user":
+            pending_question = message["content"]
+
+        elif message["role"] == "assistant" and pending_question:
+            conversation_memory.add_turn(
+                user_id=user_id,
+                session_id=session_id,
+                question=pending_question,
+                answer=message["content"],
+            )
+
+            pending_question = None
 
 def classify_question_intent(question: str) -> str:
     """
@@ -342,6 +380,11 @@ def answer_question(
     # ============================================================
     # 2. SHORT-TERM MEMORY RETRIEVAL
     # ============================================================
+
+    restore_conversation_memory(
+    user_id=user_id,
+    session_id=session_id,
+    )
 
     with trace_stage("Short-term memory retrieval") as trace:
 

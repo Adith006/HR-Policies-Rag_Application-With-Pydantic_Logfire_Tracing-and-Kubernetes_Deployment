@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel, Field
 
 from app.rag_pipeline import answer_question
-from app.memory import ConversationMemory
+# from app.memory import ConversationMemory
 
 from app.llm.client import extract_long_term_memories
 from app.memory_store import (
@@ -24,12 +24,20 @@ from contextlib import asynccontextmanager
 from app.embeddings import get_embedding_model
 from app.retrieval.search import _get_reranker
 from app.rag_trace import capture_rag_trace
+from app.conversation_store import (
+    create_conversation,
+    save_message,
+    get_conversations,
+    get_messages,
+    set_conversation_pinned,
+    delete_conversation,
+)
 
 # Send traces to Logfire when a valid token is configured.
 logfire.configure(send_to_logfire="if-token-present")
 
-conversation_memory = ConversationMemory()
 # GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+
 
 
 STREAMLIT_AUTH_SECRET = os.getenv("STREAMLIT_AUTH_SECRET")
@@ -39,9 +47,14 @@ AUTH_AUDIENCE = "enterprise-hr-api"
 
 
 def verify_google_token(
-    authorization: str = Header(...),
+    authorization: str | None = Header(default=None),
 ) -> str:
     """Verify the signed identity assertion issued by Streamlit."""
+    if not authorization:
+        raise HTTPException(
+        status_code=401,
+        detail="Authentication required.",
+    )
 
     if not STREAMLIT_AUTH_SECRET:
         raise HTTPException(
@@ -208,51 +221,211 @@ class QuestionRequest(BaseModel):
         description="Unique identifier for this conversation"
     )
 
+class CreateConversationRequest(BaseModel):
+    conversation_id: UUID | None = None
+
+
+class PinConversationRequest(BaseModel):
+    is_pinned: bool
+
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
 
+@app.post("/conversations")
+def create_new_conversation(
+    request: CreateConversationRequest | None = None,
+    user_id: str = Depends(verify_google_token),
+):
+    """Create a new conversation for the authenticated user."""
+
+    try:
+        conversation_id = (
+            str(request.conversation_id)
+            if request and request.conversation_id
+            else None
+        )
+
+        return create_conversation(
+            user_id=user_id,
+            conversation_id=conversation_id,
+        )
+
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=403,
+            detail=str(exc),
+        ) from exc
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+
+
+@app.get("/conversations")
+def list_user_conversations(
+    limit: int = 50,
+    user_id: str = Depends(verify_google_token),
+):
+    """Retrieve the authenticated user's conversation history."""
+
+    try:
+        return {
+            "conversations": get_conversations(
+                user_id=user_id,
+                limit=limit,
+            )
+        }
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+
+
+@app.get("/conversations/{conversation_id}/messages")
+def retrieve_conversation_messages(
+    conversation_id: UUID,
+    user_id: str = Depends(verify_google_token),
+):
+    """Retrieve messages belonging to an owned conversation."""
+
+    try:
+        return {
+            "messages": get_messages(
+                conversation_id=str(conversation_id),
+                user_id=user_id,
+            )
+        }
+
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        ) from exc
+
+
+@app.patch("/conversations/{conversation_id}/pin")
+def update_conversation_pin(
+    conversation_id: UUID,
+    request: PinConversationRequest,
+    user_id: str = Depends(verify_google_token),
+):
+    """Pin or unpin an owned conversation."""
+
+    updated = set_conversation_pinned(
+        conversation_id=str(conversation_id),
+        user_id=user_id,
+        is_pinned=request.is_pinned,
+    )
+
+    if not updated:
+        raise HTTPException(
+            status_code=404,
+            detail="Conversation was not found.",
+        )
+
+    return {
+        "success": True,
+        "conversation_id": str(conversation_id),
+        "is_pinned": request.is_pinned,
+    }
+
+
+@app.delete("/conversations/{conversation_id}")
+def remove_conversation(
+    conversation_id: UUID,
+    user_id: str = Depends(verify_google_token),
+):
+    """Delete an owned conversation and its messages."""
+
+    deleted = delete_conversation(
+        conversation_id=str(conversation_id),
+        user_id=user_id,
+    )
+
+    if not deleted:
+        raise HTTPException(
+            status_code=404,
+            detail="Conversation was not found.",
+        )
+
+    return {
+        "success": True,
+        "conversation_id": str(conversation_id),
+        "message": "Conversation deleted successfully.",
+    }
+
 
 @app.post("/ask")
-def ask_question(request: QuestionRequest,user_id: str = Depends(verify_google_token),):
+def ask_question(
+    request: QuestionRequest,
+    user_id: str = Depends(verify_google_token),
+):
     try:
         session_id = str(request.session_id)
+
+        # Ensure the conversation exists and belongs to this user.
+        create_conversation(
+            user_id=user_id,
+            conversation_id=session_id,
+        )
 
         # Handle explicit long-term memory requests separately.
         if is_memory_eligible(request.question):
             saved_count = save_user_memories(
                 user_message=request.question,
-                user_id= user_id,
+                user_id=user_id,
                 session_id=session_id,
             )
 
             if saved_count:
-                return {
-                    "answer": (
-                        f"I've saved {saved_count} "
-                        "memory item(s) for future conversations."
-                    ),
-                    "sources": [],
-                    "retrieved_contexts": [],
-                    "memory_saved": True,
-                    "memory_count": saved_count,
-                }
-
-            return {
-                "answer": (
+                answer = (
+                    f"I've saved {saved_count} "
+                    "memory item(s) for future conversations."
+                )
+            else:
+                answer = (
                     "I couldn't identify any safe, useful information "
                     "to remember from that message."
-                ),
+                )
+
+            # Persist the memory request in conversation history.
+            save_message(
+                conversation_id=session_id,
+                user_id=user_id,
+                role="user",
+                content=request.question,
+            )
+
+            save_message(
+                conversation_id=session_id,
+                user_id=user_id,
+                role="assistant",
+                content=answer,
+                metadata={
+                    "memory_saved": bool(saved_count),
+                    "memory_count": saved_count,
+                    "sources": [],
+                    "retrieved_contexts": [],
+                },
+            )
+
+            return {
+                "answer": answer,
                 "sources": [],
                 "retrieved_contexts": [],
-                "memory_saved": False,
-                "memory_count": 0,
+                "memory_saved": bool(saved_count),
+                "memory_count": saved_count,
             }
 
         # Preserve existing conversation-history lookup.
         # history = conversation_memory.get_history(session_id)
         # history = conversation_memory.get_history(user_id, session_id)
-
+        # restore_conversation_memory(user_id, session_id)
         # Capture actual RAG pipeline execution stages.
         with capture_rag_trace() as trace_events:
             with logfire.span("rag.answer_question"):
@@ -284,22 +457,43 @@ def ask_question(request: QuestionRequest,user_id: str = Depends(verify_google_t
         else:
             raise ValueError("Unexpected RAG response format.")
 
-        # conversation_memory.add_turn(
-        #     user_id = user_id,
-        #     session_id=session_id,
-        #     question=request.question,
-        #     answer=answer,
-        # )
-
         # Include trace events in the FastAPI response.
         response_data["trace"] = trace_events
+
+        # Persist the user question.
+        save_message(
+            conversation_id=session_id,
+            user_id=user_id,
+            role="user",
+            content=request.question,
+        )
+
+        # Persist the assistant response and supporting metadata.
+        save_message(
+            conversation_id=session_id,
+            user_id=user_id,
+            role="assistant",
+            content=answer,
+            metadata={
+                "sources": response_data.get("sources", []),
+                "retrieved_contexts": response_data.get(
+                    "retrieved_contexts", []
+                ),
+                "trace": trace_events,
+            },
+        )
 
         return response_data
 
     except ValueError as exc:
         raise HTTPException(
-
             status_code=400,
+            detail=str(exc),
+        ) from exc
+
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=403,
             detail=str(exc),
         ) from exc
 

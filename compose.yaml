@@ -119,18 +119,70 @@
 #     restart: unless-stopped
 
 
+# services:
+#   api:
+#     image: ghcr.io/adith006/enterprise-ai-knowledge-platform-api:latest
+#     container_name: knowledge-api
+#     expose:
+#       - "8000"
+#     env_file:
+#       - .env
+#     restart: unless-stopped
+
+#   ui:
+#     image: ghcr.io/adith006/enterprise-ai-knowledge-platform-ui:latest
+#     container_name: knowledge-ui
+#     ports:
+#       - "8502:8501"
+#     env_file:
+#       - .env
+#     environment:
+#       API_BASE_URL: http://api:8000
+#     depends_on:
+#       - api
+#     restart: unless-stopped
+
+#   caddy:
+#     image: caddy:2
+#     container_name: knowledge-caddy
+#     ports:
+#       - "80:80"
+#       - "443:443"
+#     volumes:
+#       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+#       - caddy_data:/data
+#       - caddy_config:/config
+#     depends_on:
+#       - api
+#     restart: unless-stopped
+
+# volumes:
+#   caddy_data:
+#   caddy_config:
+
+
 services:
   api:
-    image: ghcr.io/adith006/enterprise-ai-knowledge-platform-api:latest
+    image: ghcr.io/adith006/enterprise-ai-knowledge-platform-api:${IMAGE_TAG:-latest}
     container_name: knowledge-api
     expose:
       - "8000"
     env_file:
       - .env
     restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   ui:
-    image: ghcr.io/adith006/enterprise-ai-knowledge-platform-ui:latest
+    image: ghcr.io/adith006/enterprise-ai-knowledge-platform-ui:${IMAGE_TAG:-latest}
     container_name: knowledge-ui
     ports:
       - "8502:8501"
@@ -138,9 +190,20 @@ services:
       - .env
     environment:
       API_BASE_URL: http://api:8000
-    depends_on:
-      - api
     restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health', timeout=5)"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   caddy:
     image: caddy:2
@@ -152,9 +215,12 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
-    depends_on:
-      - api
     restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+      ui:
+        condition: service_healthy
 
 volumes:
   caddy_data:

@@ -127,10 +127,11 @@ def store_memory(
             memory_text=memory_text,
             embedding=embedding,
             metadata_={
+                **(metadata or {}),
                 "type": memory_type,
                 "source": "conversation",
-                **(metadata or {}),
-            },
+        },
+
         )
 
         session.add(memory)

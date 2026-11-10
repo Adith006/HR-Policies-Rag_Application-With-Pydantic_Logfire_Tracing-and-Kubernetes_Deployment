@@ -1,4 +1,4 @@
-
+﻿
 name: Enterprise AI Platform CI/CD
 
 on:
@@ -10,7 +10,7 @@ on:
         description: "Publish images and deploy to Oracle Cloud"
         required: true
         type: boolean
-        default: false
+        default: true
 
 permissions:
   contents: read
@@ -19,6 +19,7 @@ jobs:
   validate:
     name: Python and dependency validation
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -49,6 +50,7 @@ jobs:
     name: Build and publish Docker images
     needs: validate
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     permissions:
       contents: read
@@ -102,20 +104,29 @@ jobs:
           docker push "${UI_IMAGE}:${GITHUB_SHA}"
           docker push "${UI_IMAGE}:latest"
 
+
   deploy-oracle:
     name: Deploy to Oracle Cloud
     needs: docker-build
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && inputs.deploy_oracle }}
+    if: ${{ (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) || (github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && inputs.deploy_oracle) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+
+    concurrency:
+      group: oracle-production-deployment
+      cancel-in-progress: false
 
     steps:
-      - name: Deploy latest images to Oracle VM
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Deploy commit-specific images to Oracle VM
         env:
           ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
           ORACLE_USER: ${{ secrets.ORACLE_USER }}
           ORACLE_SSH_PRIVATE_KEY_B64: ${{ secrets.ORACLE_SSH_PRIVATE_KEY_B64 }}
           ORACLE_KNOWN_HOSTS: ${{ secrets.ORACLE_KNOWN_HOSTS }}
+          IMAGE_TAG: ${{ github.sha }}
         run: |
           set -euo pipefail
 
@@ -124,10 +135,7 @@ jobs:
 
           trap 'rm -f "$KEY_FILE" "$KNOWN_HOSTS_FILE"' EXIT
 
-          # Decode the Base64-encoded RSA private key
           printf '%s' "$ORACLE_SSH_PRIVATE_KEY_B64" | base64 --decode > "$KEY_FILE"
-
-          # Normalize Windows line endings if present
           sed -i 's/\r$//' "$KEY_FILE"
 
           printf '%s\n' "$ORACLE_KNOWN_HOSTS" > "$KNOWN_HOSTS_FILE"
@@ -135,29 +143,37 @@ jobs:
           chmod 600 "$KEY_FILE"
           chmod 600 "$KNOWN_HOSTS_FILE"
 
-          # Validate the decoded private key before connecting
           ssh-keygen -y -f "$KEY_FILE" > /dev/null
 
-          # Connect to Oracle and deploy the latest images
-          ssh \
-            -i "$KEY_FILE" \
-            -o IdentitiesOnly=yes \
-            -o BatchMode=yes \
-            -o StrictHostKeyChecking=yes \
-            -o UserKnownHostsFile="$KNOWN_HOSTS_FILE" \
-            -o ConnectTimeout=15 \
-            "$ORACLE_USER@$ORACLE_HOST" \
-            'set -e
+          SSH_OPTS=(
+            -i "$KEY_FILE"
+            -o IdentitiesOnly=yes
+            -o BatchMode=yes
+            -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$KNOWN_HOSTS_FILE"
+            -o ConnectTimeout=15
+          )
+
+          # Transfer the Compose configuration from this exact commit.
+          scp "${SSH_OPTS[@]}" \
+            compose.yaml \
+            "$ORACLE_USER@$ORACLE_HOST:/home/opc/compose.yaml.new"
+
+          # Activate the configuration and deploy matching image tags.
+          ssh "${SSH_OPTS[@]}" "$ORACLE_USER@$ORACLE_HOST" \
+            "set -e
              cd /home/opc
-             sudo docker compose -f compose.yaml pull api ui
-             sudo docker compose -f compose.yaml up -d --remove-orphans
-             sudo docker compose -f compose.yaml ps'
+             mv compose.yaml.new compose.yaml
+             export IMAGE_TAG='$IMAGE_TAG'
+             sudo --preserve-env=IMAGE_TAG docker compose -f compose.yaml pull api ui
+             sudo --preserve-env=IMAGE_TAG docker compose -f compose.yaml up -d --remove-orphans
+             sudo --preserve-env=IMAGE_TAG docker compose -f compose.yaml ps"
 
       - name: Verify production HTTPS endpoint
         run: |
           set -euo pipefail
 
-          API_URL="https://hr-policies-api.duckdns.org/docs"
+          API_URL="https://hr-policies-api.duckdns.org/health"
 
           for attempt in $(seq 1 12); do
             if curl --fail --silent --show-error "$API_URL" -o /dev/null; then
