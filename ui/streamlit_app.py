@@ -32,13 +32,36 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-load_dotenv()
+import os
+import sys
+from pathlib import Path
 
-# Load Streamlit Cloud secrets into environment variables
-if not os.getenv("DATABASE_URL") and "DATABASE_URL" in st.secrets:
-    os.environ["DATABASE_URL"] = str(st.secrets["DATABASE_URL"])
+import streamlit as st
+from dotenv import load_dotenv
 
-# Other imports
+# Resolve project root
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+# Load local environment
+load_dotenv(PROJECT_ROOT / ".env")
+
+# Load Streamlit Cloud secrets
+try:
+    if not os.getenv("DATABASE_URL") and "DATABASE_URL" in st.secrets:
+        os.environ["DATABASE_URL"] = str(st.secrets["DATABASE_URL"])
+except Exception:
+    pass
+
+# Safe diagnostic: never print the actual database URL
+st.write(
+    "Database configuration loaded:",
+    bool(os.getenv("DATABASE_URL"))
+)
+
+# Only now import application modules
 import jwt
 from datetime import datetime, timedelta, timezone
 
