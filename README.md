@@ -649,7 +649,7 @@ Rotate any credential that has been exposed in logs, screenshots, terminal outpu
 ### Clone the Repository
 
 \`\`\`bash
-git clone https://github.com/Adith006/HR-Policies-Rag_Application-With-Pydantic_Logfire_Tracing-and_Kubernetes_Deployment.git
+git clone https://github.com/Adith006/HR-Policies-Rag_Application-With-Pydantic_Logfire_Tracing-and-Kubernetes_Deployment.git
 
 cd HR-Policies-Rag_Application-With-Pydantic_Logfire_Tracing-and_Kubernetes_Deployment
 \`\`\`
