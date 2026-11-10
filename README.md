@@ -789,7 +789,7 @@ The production workflow has been exercised end to end, including document retrie
 ## Repository
 
 **GitHub:**  
-https://github.com/Adith006/HR-Policies-Rag_Application-With-Pydantic_Logfire_Tracing-and_Kubernetes_Deployment
+https://github.com/Adith006/HR-Policies-Rag_Application-With-Pydantic_Logfire_Tracing-and-Kubernetes_Deployment
 
 **Live Application:**  
 https://enterprise-hr-assistant.streamlit.app/
