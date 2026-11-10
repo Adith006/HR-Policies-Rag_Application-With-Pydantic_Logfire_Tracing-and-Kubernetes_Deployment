@@ -5,22 +5,44 @@ import json
 import os
 import sys
 import uuid
+# from pathlib import Path
+
+
+# # Resolve project root before importing project modules.
+# PROJECT_ROOT = Path(__file__).resolve().parents[1]
+# sys.path.insert(0, str(PROJECT_ROOT))
+
+# import streamlit as st
+# from dotenv import load_dotenv
+# import jwt
+# from datetime import datetime, timedelta, timezone
+# from app.conversation_store import get_messages
+
+
+# # Load local environment configuration.
+# load_dotenv(PROJECT_ROOT / ".env")
+
 from pathlib import Path
 
-
-# Resolve project root before importing project modules.
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(PROJECT_ROOT))
-
-import streamlit as st
 from dotenv import load_dotenv
+import streamlit as st
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+load_dotenv()
+
+# Load Streamlit Cloud secrets into environment variables
+if not os.getenv("DATABASE_URL") and "DATABASE_URL" in st.secrets:
+    os.environ["DATABASE_URL"] = str(st.secrets["DATABASE_URL"])
+
+# Other imports
 import jwt
 from datetime import datetime, timedelta, timezone
+
 from app.conversation_store import get_messages
-
-
-# Load local environment configuration.
-load_dotenv(PROJECT_ROOT / ".env")
 
 # Import application modules only after setting the project path.
 from ui.HR_Policy_Manual import display_policy_manual
