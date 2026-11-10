@@ -258,7 +258,7 @@ def collect_pipeline_result(
 
     retrieved_items = [
         (item, item["context_text"].strip())
-        for item in raw_resultsc
+        for item in raw_results
         if isinstance(item.get("context_text"), str)
         and item["context_text"].strip()
     ]
