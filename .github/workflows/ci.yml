@@ -16,101 +16,139 @@ permissions:
   contents: read
 
 jobs:
+
+  # ============================================================
+  # 1. VALIDATE APPLICATION AND RUN AUTOMATED TESTS
+  # ============================================================
+
   validate:
-    name: Python and dependency validation
+    name: Validate and Test
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+
+    # Test configuration only.
+    # These are dummy URLs; production credentials are not used.
+    env:
+      REDIS_URL: redis://localhost:6379/0
+      DATABASE_URL: postgresql://test:test@localhost:5432/test_db
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v4
 
-      - name: Install uv and Python
-        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-          enable-cache: true
 
-      - name: Verify lockfile
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Check lock file
         run: uv lock --check
 
-      - name: Install application dependencies
-        run: uv sync --frozen --no-dev --no-install-project --group evaluation
+      - name: Install dependencies
+        run: uv sync --frozen --no-install-project --group evaluation
 
-      - name: Check Python syntax
-        run: .venv/bin/python -m compileall -q app evals ui tests
-
-      - name: Install test tools
-        run: uv pip install --python .venv/bin/python pytest
+      - name: Compile Python files
+        run: uv run python -m compileall -q app evals ui tests
 
       - name: Run automated tests
-        run: .venv/bin/python -m pytest -v tests
+        run: uv run python -m pytest -v tests
+
+
+  # ============================================================
+  # 2. BUILD AND PUBLISH DOCKER IMAGES TO GHCR
+  # ============================================================
 
   docker-build:
-    name: Build and publish Docker images
-    needs: validate
+    name: Build and Publish Docker Images
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    needs: validate
 
     permissions:
       contents: read
       packages: write
 
-    env:
-      API_IMAGE: ghcr.io/adith006/enterprise-ai-knowledge-platform-api
-      UI_IMAGE: ghcr.io/adith006/enterprise-ai-knowledge-platform-ui
-
     steps:
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v4
 
-      - name: Build API image
-        run: |
-          docker build \
-            --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
-            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
-            --tag "${API_IMAGE}:${GITHUB_SHA}" \
-            --tag "${API_IMAGE}:latest" \
-            .
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Build Streamlit image
-        run: |
-          docker build \
-            --file ui/Dockerfile \
-            --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
-            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
-            --tag "${UI_IMAGE}:${GITHUB_SHA}" \
-            --tag "${UI_IMAGE}:latest" \
-            .
+      - name: Log in to GitHub Container Registry
+        if: >
+          (github.event_name == 'push' &&
+           github.ref == 'refs/heads/master') ||
+          (github.event_name == 'workflow_dispatch' &&
+           github.ref == 'refs/heads/master' &&
+           inputs.deploy_oracle == true)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Authenticate to GitHub Container Registry
-        if: ${{ (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) || (github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && inputs.deploy_oracle) }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          printf '%s' "$GH_TOKEN" | docker login ghcr.io \
-            --username "$GITHUB_ACTOR" \
-            --password-stdin
+      # ----------------------------------------------------------
+      # API IMAGE
+      # ----------------------------------------------------------
 
-      - name: Publish API image
-        if: ${{ (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) || (github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && inputs.deploy_oracle) }}
-        run: |
-          docker push "${API_IMAGE}:${GITHUB_SHA}"
-          docker push "${API_IMAGE}:latest"
+      - name: Build and publish API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: >
+            ${{ (github.event_name == 'push' &&
+                 github.ref == 'refs/heads/master') ||
+                (github.event_name == 'workflow_dispatch' &&
+                 github.ref == 'refs/heads/master' &&
+                 inputs.deploy_oracle == true) }}
+          tags: |
+            ghcr.io/adith006/enterprise-ai-knowledge-platform-api:${{ github.sha }}
+            ghcr.io/adith006/enterprise-ai-knowledge-platform-api:latest
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
 
-      - name: Publish Streamlit image
-        if: ${{ (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) || (github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && inputs.deploy_oracle) }}
-        run: |
-          docker push "${UI_IMAGE}:${GITHUB_SHA}"
-          docker push "${UI_IMAGE}:latest"
+      # ----------------------------------------------------------
+      # STREAMLIT UI IMAGE
+      # ----------------------------------------------------------
 
+      - name: Build and publish UI image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ui/Dockerfile
+          push: >
+            ${{ (github.event_name == 'push' &&
+                 github.ref == 'refs/heads/master') ||
+                (github.event_name == 'workflow_dispatch' &&
+                 github.ref == 'refs/heads/master' &&
+                 inputs.deploy_oracle == true) }}
+          tags: |
+            ghcr.io/adith006/enterprise-ai-knowledge-platform-ui:${{ github.sha }}
+            ghcr.io/adith006/enterprise-ai-knowledge-platform-ui:latest
+          cache-from: type=gha,scope=ui
+          cache-to: type=gha,mode=max,scope=ui
+
+
+  # ============================================================
+  # 3. DEPLOY TO ORACLE CLOUD
+  # ============================================================
 
   deploy-oracle:
     name: Deploy to Oracle Cloud
-    needs: docker-build
-    if: ${{ (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) || (github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && inputs.deploy_oracle) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+
+    needs:
+      - docker-build
+
+    if: >
+      (github.event_name == 'push' &&
+       github.ref == 'refs/heads/master') ||
+      (github.event_name == 'workflow_dispatch' &&
+       github.ref == 'refs/heads/master' &&
+       inputs.deploy_oracle == true)
 
     concurrency:
       group: oracle-production-deployment
@@ -118,66 +156,88 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v4
 
-      - name: Deploy commit-specific images to Oracle VM
+      - name: Configure SSH
+        env:
+          ORACLE_SSH_PRIVATE_KEY_B64: ${{ secrets.ORACLE_SSH_PRIVATE_KEY_B64 }}
+          ORACLE_KNOWN_HOSTS: ${{ secrets.ORACLE_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          printf '%s' "$ORACLE_SSH_PRIVATE_KEY_B64" \
+            | base64 --decode > ~/.ssh/oracle_key
+
+          sed -i 's/\r$//' ~/.ssh/oracle_key
+          chmod 600 ~/.ssh/oracle_key
+
+          printf '%s\n' "$ORACLE_KNOWN_HOSTS" \
+            > ~/.ssh/known_hosts
+
+          chmod 600 ~/.ssh/known_hosts
+
+          ssh-keygen -y -f ~/.ssh/oracle_key > /dev/null
+
+      - name: Transfer production Compose configuration
         env:
           ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
           ORACLE_USER: ${{ secrets.ORACLE_USER }}
-          ORACLE_SSH_PRIVATE_KEY_B64: ${{ secrets.ORACLE_SSH_PRIVATE_KEY_B64 }}
-          ORACLE_KNOWN_HOSTS: ${{ secrets.ORACLE_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+
+          scp \
+            -i ~/.ssh/oracle_key \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile=~/.ssh/known_hosts \
+            compose.yaml \
+            "$ORACLE_USER@$ORACLE_HOST:/home/opc/compose.yaml.new"
+
+      - name: Deploy application on Oracle Cloud
+        env:
+          ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
+          ORACLE_USER: ${{ secrets.ORACLE_USER }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
           set -euo pipefail
 
-          KEY_FILE="$RUNNER_TEMP/oracle_deploy_key"
-          KNOWN_HOSTS_FILE="$RUNNER_TEMP/oracle_known_hosts"
+          ssh \
+            -i ~/.ssh/oracle_key \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile=~/.ssh/known_hosts \
+            "$ORACLE_USER@$ORACLE_HOST" \
+            "IMAGE_TAG='$IMAGE_TAG' bash -s" <<'REMOTE'
 
-          trap 'rm -f "$KEY_FILE" "$KNOWN_HOSTS_FILE"' EXIT
+          set -euo pipefail
 
-          printf '%s' "$ORACLE_SSH_PRIVATE_KEY_B64" | base64 --decode > "$KEY_FILE"
-          sed -i 's/\r$//' "$KEY_FILE"
+          cd /home/opc
 
-          printf '%s\n' "$ORACLE_KNOWN_HOSTS" > "$KNOWN_HOSTS_FILE"
+          # Activate the newly transferred Compose configuration
+          mv compose.yaml.new compose.yaml
 
-          chmod 600 "$KEY_FILE"
-          chmod 600 "$KNOWN_HOSTS_FILE"
+          # Pull the exact images built by this workflow
+          sudo --preserve-env=IMAGE_TAG \
+            docker compose -f compose.yaml pull api ui
 
-          ssh-keygen -y -f "$KEY_FILE" > /dev/null
+          # Apply the updated deployment configuration
+          sudo --preserve-env=IMAGE_TAG \
+            docker compose -f compose.yaml up -d --remove-orphans
 
-          SSH_OPTS=(
-            -i "$KEY_FILE"
-            -o IdentitiesOnly=yes
-            -o BatchMode=yes
-            -o StrictHostKeyChecking=yes
-            -o UserKnownHostsFile="$KNOWN_HOSTS_FILE"
-            -o ConnectTimeout=15
-          )
+          # Display deployment status
+          sudo docker compose -f compose.yaml ps
 
-          # Transfer the Compose configuration from this exact commit.
-          scp "${SSH_OPTS[@]}" \
-            compose.yaml \
-            "$ORACLE_USER@$ORACLE_HOST:/home/opc/compose.yaml.new"
+          REMOTE
 
-          # Activate the configuration and deploy matching image tags.
-          ssh "${SSH_OPTS[@]}" "$ORACLE_USER@$ORACLE_HOST" \
-            "set -e
-             cd /home/opc
-             mv compose.yaml.new compose.yaml
-             export IMAGE_TAG='$IMAGE_TAG'
-             sudo --preserve-env=IMAGE_TAG docker compose -f compose.yaml pull api ui
-             sudo --preserve-env=IMAGE_TAG docker compose -f compose.yaml up -d --remove-orphans
-             sudo --preserve-env=IMAGE_TAG docker compose -f compose.yaml ps"
-
-      - name: Verify production HTTPS endpoint
+      - name: Verify production API health
         run: |
           set -euo pipefail
 
-          API_URL="https://hr-policies-api.duckdns.org/health"
-
           for attempt in $(seq 1 12); do
-            if curl --fail --silent --show-error "$API_URL" -o /dev/null; then
-              echo "Oracle deployment verified successfully."
+            if curl --fail --silent --show-error \
+              https://hr-policies-api.duckdns.org/health; then
+              echo "Production API is healthy."
               exit 0
             fi
 
@@ -185,5 +245,5 @@ jobs:
             sleep 10
           done
 
-          echo "Deployment health verification failed."
+          echo "Production API health check failed."
           exit 1
