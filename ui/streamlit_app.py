@@ -7,7 +7,6 @@ import sys
 import uuid
 from pathlib import Path
 from datetime import datetime, timedelta, timezone
-from ui.error_messages import user_facing_error_message
 import jwt
 import streamlit as st
 from dotenv import load_dotenv
@@ -20,6 +19,9 @@ if str(PROJECT_ROOT) not in sys.path:
 
 # Load local environment variables
 load_dotenv(PROJECT_ROOT / ".env")
+
+
+from ui.error_messages import user_facing_error_message
 
 # Load Streamlit Cloud secrets into environment variables
 SECRET_KEYS = (
