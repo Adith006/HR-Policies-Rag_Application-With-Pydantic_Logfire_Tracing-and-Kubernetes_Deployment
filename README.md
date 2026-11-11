@@ -4,33 +4,38 @@ An end-to-end, production-oriented Retrieval-Augmented Generation (RAG) applicat
 
 The platform combines document ingestion, vector search, semantic retrieval, cross-encoder reranking, LLM-powered answer generation, conversation memory, security guardrails, source citations, RAGAS evaluation, observability, and automated cloud deployment.
 
+
+**[Try the live application](https://hr-policy-assistant-rag.streamlit.app/)** · **[View the source code](https://github.com/Adith006/HR-Policies-Rag_Application-With-Pydantic_Logfire_Tracing-and-Oracle_Deployment)** · **[Open the API documentation](https://hr-policies-api.duckdns.org/docs)**
+
 ---
 
 ## Table of Contents
 
-1. [Project Overview](#project-overview)
-2. [Problem Statement](#problem-statement)
-3. [Key Features](#key-features)
-4. [System Architecture](#system-architecture)
-5. [End-to-End RAG Workflow](#end-to-end-rag-workflow)
-6. [Document Ingestion and Processing](#document-ingestion-and-processing)
-7. [Retrieval and Answer Generation](#retrieval-and-answer-generation)
-8. [Conversation Memory and Persistence](#conversation-memory-and-persistence)
-9. [Security and Guardrails](#security-and-guardrails)
-10. [RAGAS Evaluation](#ragas-evaluation)
-11. [Observability with Pydantic Logfire](#observability-with-pydantic-logfire)
-12. [Technology Stack](#technology-stack)
-13. [Deployment Architecture](#deployment-architecture)
-14. [CI/CD Pipeline](#cicd-pipeline)
-15. [Environment Configuration](#environment-configuration)
-16. [Local Development](#local-development)
-17. [API and Application Access](#api-and-application-access)
-18. [Security Considerations](#security-considerations)
-19. [Future Improvements](#future-improvements)
+- [Project Overview](#project-overview)
+- [Problem Statement](#problem-statement)
+- [Key Features](#key-features)
+- [System Architecture](#system-architecture)
+- [End-to-End RAG Workflow](#end-to-end-rag-workflow)
+- [Document Ingestion and Processing](#document-ingestion-and-processing)
+- [Retrieval and Answer Generation](#retrieval-and-answer-generation)
+- [Conversation Memory and Persistence](#conversation-memory-and-persistence)
+- [Security and Guardrails](#security-and-guardrails)
+- [RAGAS Evaluation](#ragas-evaluation)
+- [Observability with Pydantic Logfire](#observability-with-pydantic-logfire)
+- [Technology Stack](#technology-stack)
+- [Deployment Architecture](#deployment-architecture)
+- [CI/CD Pipeline](#cicd-pipeline)
+- [Environment Configuration](#environment-configuration)
+- [Local Development](#local-development)
+- [API and Application Access](#api-and-application-access)
+- [Security Considerations](#security-considerations)
+- [Future Improvements](#future-improvements)
+- [Project Status](#project-status)
+- [Repository](#repository)
 
 ---
 
-## 1. Project Overview
+## Project Overview
 
 Enterprise HR departments manage extensive policy documentation covering employee benefits, leave policies, compensation, compliance, workplace guidelines, and organizational procedures.
 
@@ -42,7 +47,7 @@ Instead of searching manually through policy documents, users can ask questions 
 
 The platform follows a modular architecture that separates the user interface, backend orchestration, retrieval infrastructure, persistent storage, evaluation, and deployment.
 
-## 2. Problem Statement
+## Problem Statement
 
 Traditional HR policy management presents several challenges:
 
@@ -67,7 +72,7 @@ Build a production-oriented RAG application that:
 - Provides observability through Pydantic Logfire.
 - Supports containerized deployment and automated CI/CD.
 
-## 3. Key Features
+## Key Features
 
 | Feature | Description |
 |---|---|
@@ -86,13 +91,13 @@ Build a production-oriented RAG application that:
 | Cloud deployment | Deploys containerized backend services and a cloud-hosted UI |
 | Automated CI/CD | Automates testing, image building, publishing, and deployment |
 
-## 4. System Architecture
+## System Architecture
 
 The application separates the frontend, backend, databases, memory services, and observability infrastructure.
 
 ### High-Level Architecture
 
-\`\`\`mermaid
+```mermaid
 flowchart TD
     USER[User] --> UI[Streamlit Community Cloud]
 
@@ -131,7 +136,7 @@ flowchart TD
     API --> UI
 
     EVAL[RAGAS Evaluation] --> API
-\`\`\`
+```
 
 ### Main Architectural Components
 
@@ -163,11 +168,11 @@ flowchart TD
 - GitHub Container Registry.
 - Oracle Cloud Infrastructure.
 
-## 5. End-to-End RAG Workflow
+## End-to-End RAG Workflow
 
 The application follows a multi-stage RAG pipeline.
 
-\`\`\`mermaid
+```mermaid
 flowchart TD
     A[HR Policy Documents] --> B[Document Extraction]
     B --> C[Text Normalization]
@@ -193,7 +198,7 @@ flowchart TD
 
     S --> OUT[Response to User]
     OUT --> MEM[Memory and Cache Updates]
-\`\`\`
+```
 
 ### Pipeline Stages
 
@@ -213,7 +218,7 @@ flowchart TD
 
 ---
 
-## 6. Document Ingestion and Processing
+## Document Ingestion and Processing
 
 The ingestion stage prepares organizational HR policy documents for semantic retrieval.
 
@@ -251,7 +256,7 @@ The resulting index supports semantic similarity search during question answerin
 
 ---
 
-## 7. Retrieval and Answer Generation
+## Retrieval and Answer Generation
 
 The retrieval pipeline is responsible for identifying relevant policy passages and generating contextual responses.
 
@@ -296,7 +301,7 @@ Source information is constructed from retrieved passages so users can identify 
 
 ---
 
-## 8. Conversation Memory and Persistence
+## Conversation Memory and Persistence
 
 The application supports conversation continuity through multiple memory and persistence mechanisms.
 
@@ -334,7 +339,7 @@ Persisted conversation-history restoration is disabled for these synthetic sessi
 
 ---
 
-## 9. Security and Guardrails
+## Security and Guardrails
 
 Security and response reliability are important requirements for an application that handles organizational policy information.
 
@@ -379,7 +384,7 @@ Guardrails reduce risk but do not guarantee that every generated answer is corre
 
 ---
 
-## 10. RAGAS Evaluation
+## RAGAS Evaluation
 
 The project includes a RAGAS evaluation workflow to assess the RAG pipeline.
 
@@ -387,7 +392,7 @@ Evaluation is exposed through the backend API and integrated with the Streamlit 
 
 ### Evaluation Workflow
 
-\`\`\`mermaid
+```mermaid
 flowchart TD
     A[Evaluation Question Set] --> B[Generate Synthetic Session]
     B --> C[Execute RAG Pipeline]
@@ -403,7 +408,7 @@ flowchart TD
     H --> I[Calculate Configured Metrics]
     I --> J[Generate Evaluation Report]
     J --> K[Streamlit Evaluation Dashboard]
-\`\`\`
+```
 
 ### Evaluation Stages
 
@@ -424,7 +429,7 @@ RAGAS is used as an evaluation mechanism, not as a guarantee of production answe
 
 ---
 
-## 11. Observability with Pydantic Logfire
+## Observability with Pydantic Logfire
 
 Pydantic Logfire provides tracing and execution visibility across the application.
 
@@ -460,7 +465,7 @@ Logfire traces should be configured to avoid exposing API keys, database credent
 
 ---
 
-## 12. Technology Stack
+## Technology Stack
 
 | Category | Technologies |
 |---|---|
@@ -485,7 +490,7 @@ Logfire traces should be configured to avoid exposing API keys, database credent
 
 ---
 
-## 13. Deployment Architecture
+## Deployment Architecture
 
 The current production application uses a distributed cloud deployment.
 
@@ -533,20 +538,20 @@ The application uses:
 ### Live Application
 
 **Streamlit Application:**  
-https://enterprise-hr-assistant.streamlit.app/
+[Open the live HR Policy Assistant](https://hr-policy-assistant-rag.streamlit.app/)
 
 **FastAPI Backend:**  
-https://hr-policies-api.duckdns.org/docs
+[Open the FastAPI documentation](https://hr-policies-api.duckdns.org/docs)
 
 ---
 
-## 14. CI/CD Pipeline
+## CI/CD Pipeline
 
 GitHub Actions automates application validation, container image creation, publishing, and deployment.
 
 ### Deployment Lifecycle
 
-\`\`\`mermaid
+```mermaid
 flowchart TD
     A[Developer Pushes Code to GitHub] --> B[GitHub Actions Triggered]
 
@@ -565,7 +570,7 @@ flowchart TD
     J --> K[Restart / Reconcile Services]
     K --> L[Health Check]
     L --> M[Production Application]
-\`\`\`
+```
 
 ### CI/CD Stages
 
@@ -606,7 +611,7 @@ The currently verified production hosting path is Docker-based on Oracle Cloud. 
 
 ---
 
-## 15. Environment Configuration
+## Environment Configuration
 
 Application configuration is supplied through environment variables and platform secret management.
 
@@ -634,7 +639,7 @@ Rotate any credential that has been exposed in logs, screenshots, terminal outpu
 
 ---
 
-## 16. Local Development
+## Local Development
 
 ### Prerequisites
 
@@ -648,11 +653,11 @@ Rotate any credential that has been exposed in logs, screenshots, terminal outpu
 
 ### Clone the Repository
 
-\`\`\`bash
-git clone https://github.com/Adith006/HR-Policies-Rag_Application-With-Pydantic_Logfire_Tracing-and-Kubernetes_Deployment.git
+```bash
+git clone https://github.com/Adith006/HR-Policies-Rag_Application-With-Pydantic_Logfire_Tracing-and-Oracle_Deployment.git
 
-cd HR-Policies-Rag_Application-With-Pydantic_Logfire_Tracing-and_Kubernetes_Deployment
-\`\`\`
+cd HR-Policies-Rag_Application-With-Pydantic_Logfire_Tracing-and-Oracle_Deployment
+```
 
 ### Configure Environment Variables
 
@@ -668,39 +673,39 @@ Use the dependency manager and lock file provided by the repository to install t
 
 Where the repository's Compose configuration is intended for local execution:
 
-\`\`\`bash
+```bash
 docker compose up -d --build
-\`\`\`
+```
 
 Check service status:
 
-\`\`\`bash
+```bash
 docker compose ps
-\`\`\`
+```
 
 Follow logs:
 
-\`\`\`bash
+```bash
 docker compose logs -f
-\`\`\`
+```
 
 Stop the local stack:
 
-\`\`\`bash
+```bash
 docker compose down
-\`\`\`
+```
 
 Use the actual environment configuration and Compose file for the deployment target you are running. The production database and Redis services are externally managed.
 
 ---
 
-## 17. API and Application Access
+## API and Application Access
 
 ### Health Endpoint
 
-\`\`\`http
+```http
 GET /health
-\`\`\`
+```
 
 Used to verify API availability.
 
@@ -714,9 +719,9 @@ The question-answering API accepts requests from the Streamlit application and e
 
 ### RAGAS Evaluation
 
-\`\`\`http
+```http
 POST /evaluate
-\`\`\`
+```
 
 Executes the configured RAGAS evaluation workflow.
 
@@ -726,7 +731,7 @@ For exact request schemas, parameters, authentication headers, and response stru
 
 ---
 
-## 18. Security Considerations
+## Security Considerations
 
 This application works with organizational policy content and user conversation data. Production deployments should maintain the following controls:
 
@@ -746,7 +751,7 @@ Guardrails, logging, and evaluation are complementary controls. They do not repl
 
 ---
 
-## 19. Future Improvements
+## Future Improvements
 
 Potential areas for continued development include:
 
@@ -789,13 +794,13 @@ The production workflow has been exercised end to end, including document retrie
 ## Repository
 
 **GitHub:**  
-https://github.com/Adith006/HR-Policies-Rag_Application-With-Pydantic_Logfire_Tracing-and-Kubernetes_Deployment
+[View the source repository](https://github.com/Adith006/HR-Policies-Rag_Application-With-Pydantic_Logfire_Tracing-and-Oracle_Deployment)
 
 **Live Application:**  
-https://enterprise-hr-assistant.streamlit.app/
+[Launch the HR Policy Assistant](https://hr-policy-assistant-rag.streamlit.app/)
 
 **Backend API:**  
-https://hr-policies-api.duckdns.org
+[Open the API base URL](https://hr-policies-api.duckdns.org)
 
 ---
 
